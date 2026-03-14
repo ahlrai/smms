@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan migrate --force)",
+      "Bash(php artisan migrate:status)",
+      "Bash(php artisan db:show)",
+      "Bash(mysql -u root smms_db -e \"SHOW TABLES;\")",
+      "Bash(mysql -u root smms_db -e \"SELECT migration, batch FROM migrations ORDER BY id;\")",
+      "Bash(mysql -u root smms_db -e \":*)",
+      "Bash(php artisan optimize:clear)",
+      "Bash(php -l c:/laragon/www/smms/app/Filament/Widgets/EngagementChartWidget.php)",
+      "Bash(php -l c:/laragon/www/smms/app/Filament/Widgets/CalendarWidget.php)",
+      "Bash(php artisan view:clear)",
+      "Bash(php -r \":*)",
+      "Bash(php artisan about)",
+      "Bash(php artisan db:seed --class=DemoDataSeeder)",
+      "Bash(mysql -u root smms_db -e \"DESCRIBE post_media;\")",
+      "Bash(/dev/null:*)"
+    ]
+  }
+}
