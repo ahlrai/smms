@@ -29,8 +29,6 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->passwordReset()
-            ->databaseNotifications()
-            ->databaseNotificationsPolling('30s')
             ->colors([
                 'primary' => Color::hex('#14c8aa'), // Teal — warna utama sistem
             ])
