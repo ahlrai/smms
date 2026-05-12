@@ -10,11 +10,22 @@ class CreatePost extends CreateRecord
 {
     protected static string $resource = PostResource::class;
 
+    protected array $socialAccounts = [];
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['created_by'] = Auth::id();
 
+        $this->socialAccounts = $data['social_account_ids'] ?? [];
+
+        unset($data['social_account_ids']);
+
         return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        $this->record->socialAccounts()->sync($this->socialAccounts);
     }
 
     protected function getRedirectUrl(): string

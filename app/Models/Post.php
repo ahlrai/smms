@@ -159,4 +159,13 @@ class Post extends Model
             'fail_reason' => $reason,
         ]);
     }
+
+    public function socialAccounts()
+{
+    return $this->belongsToMany(
+        SocialAccount::class,
+        'post_social_accounts'
+    );
+}
+
 }

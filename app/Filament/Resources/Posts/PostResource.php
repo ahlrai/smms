@@ -71,21 +71,28 @@ class PostResource extends Resource
             |--------------------------------------------------------------------------
             */
 
-            Select::make('social_account_id')
-                ->label('Akun Sosial')
-                ->options(
-                    SocialAccount::all()->pluck('username', 'id')
-                )
-                ->required()
-                ->searchable()
-                ->live()
-                ->afterStateUpdated(
-                    fn ($state, callable $set) =>
-                    $set(
-                        'platform',
-                        SocialAccount::find($state)?->platform
-                    )
-                ),
+            Select::make('social_account_ids')
+            ->label('Akun Sosial')
+            ->multiple()
+            ->options(
+                SocialAccount::all()->mapWithKeys(function ($account) {
+                    return [
+                        $account->id => strtoupper($account->platform) . ' - ' . $account->username
+                    ];
+                })
+            )
+            ->required()
+            ->searchable()
+            ->live()
+            ->afterStateUpdated(function ($state, callable $set) {
+
+                $platforms = SocialAccount::whereIn('id', $state ?? [])
+                    ->pluck('platform')
+                    ->unique()
+                    ->implode(', ');
+
+                $set('platform', $platforms);
+            }),
 
             /*
             |--------------------------------------------------------------------------
@@ -93,15 +100,11 @@ class PostResource extends Resource
             |--------------------------------------------------------------------------
             */
 
-            Select::make('platform')
-                ->label('Platform')
-                ->options([
-                    'facebook' => 'Facebook',
-                    'instagram' => 'Instagram',
-                ])
-                ->required()
-                ->dehydrated()
-                ->disabled(),
+            Textarea::make('platform')
+            ->label('Platform')
+            ->disabled()
+            ->dehydrated()
+            ->rows(1),
 
             /*
             |--------------------------------------------------------------------------
@@ -110,8 +113,10 @@ class PostResource extends Resource
             */
 
             TextInput::make('title')
-                ->label('Judul Postingan')
-                ->maxLength(255),
+            ->label('Judul Postingan')
+            ->required()
+            ->default('Untitled Post')
+            ->maxLength(255),
 
             /*
             |--------------------------------------------------------------------------
@@ -253,9 +258,11 @@ class PostResource extends Resource
                 |--------------------------------------------------------------------------
                 */
 
-                TextColumn::make('socialAccount.username')
-                    ->label('Akun')
-                    ->searchable(),
+                TextColumn::make('socialAccounts.username')
+                ->label('Akun')
+                ->badge()
+                ->separator(', ')
+                ->searchable(),
 
                 /*
                 |--------------------------------------------------------------------------
