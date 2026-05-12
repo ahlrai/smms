@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Post extends Model
 {
@@ -27,6 +28,16 @@ class Post extends Model
         'scheduled_at' => 'datetime',
         'published_at' => 'datetime',
     ];
+
+    // 🔥 AUTO SET created_by (AMAN untuk web & tinker)
+    protected static function booted()
+    {
+        static::creating(function ($post) {
+            if (!$post->created_by && auth()->check()) {
+                $post->created_by = auth()->id();
+            }
+        });
+    }
 
     // ── RELATIONS ──────────────────────────────────────────────
 
@@ -64,12 +75,12 @@ class Post extends Model
                      ->where('scheduled_at', '<=', now());
     }
 
-    // Post yang akan publish dalam X menit (untuk notifikasi reminder)
+    // Post yang akan publish dalam X menit (untuk notifikasi)
     public function scopeUpcoming($query, int $minutes = 30)
     {
         return $query->where('status', 'scheduled')
-                     ->where('scheduled_at', '<=', now()->addMinutes($minutes))
-                     ->where('scheduled_at', '>', now());
+                     ->where('scheduled_at', '>', now())
+                     ->where('scheduled_at', '<=', now()->addMinutes($minutes));
     }
 
     public function scopeDraft($query)
@@ -95,6 +106,17 @@ class Post extends Model
     public function scopeInstagram($query)
     {
         return $query->where('platform', 'instagram');
+    }
+
+    // ── ACCESSOR (🔥 TAMBAHAN PENTING) ─────────────────────────
+
+    protected function captionPreview(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => strlen($this->caption) > 50
+                ? substr($this->caption, 0, 50) . '...'
+                : $this->caption
+        );
     }
 
     // ── HELPERS ────────────────────────────────────────────────

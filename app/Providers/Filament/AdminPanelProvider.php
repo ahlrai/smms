@@ -11,6 +11,8 @@ use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Assets\Css;
+use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -27,20 +29,46 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+
+            // AUTH
             ->login()
             ->passwordReset()
+
+            // SIDEBAR
+            ->sidebarWidth('16rem')
+
+            // WARNA
             ->colors([
-                'primary' => Color::hex('#14c8aa'), // Teal — warna utama sistem
+                'primary' => Color::hex('#14c8aa'),
             ])
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+
+            // RESOURCE
+            ->discoverResources(
+                in: app_path('Filament/Resources'),
+                for: 'App\\Filament\\Resources'
+            )
+
+            // PAGE
+            ->discoverPages(
+                in: app_path('Filament/Pages'),
+                for: 'App\\Filament\\Pages'
+            )
+
             ->pages([
                 Pages\Dashboard::class,
             ])
+
+            // WIDGET
             ->widgets([
-                StatsOverviewWidget::class,   // sort 1 — 6 stats cards
-                EngagementChartWidget::class, // sort 2 — line chart (full width)
+                StatsOverviewWidget::class,
+                EngagementChartWidget::class,
             ])
+
+            ->assets([
+            Css::make('admin-theme', resource_path('css/filament/admin/theme.css')),
+            ])
+
+            // MIDDLEWARE
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -52,6 +80,8 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+
+            // AUTH MIDDLEWARE
             ->authMiddleware([
                 Authenticate::class,
             ]);

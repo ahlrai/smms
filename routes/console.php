@@ -9,62 +9,110 @@ use App\Models\SocialAccount;
 use App\Models\CustomNotification;
 use Illuminate\Support\Facades\Schedule;
 
-// ── PUBLISH POST TERJADWAL ──────────────────────────────────────────────────
-// Cek setiap menit — cari post yang sudah waktunya dipublish
+// ─────────────────────────────────────────────────────────────
 Schedule::call(function () {
-    Post::scheduled()
-        ->with(['socialAccount', 'media'])
-        ->get()
-        ->each(fn (Post $post) => PublishPostJob::dispatch($post));
-})->everyMinute()->name('publish-scheduled-posts')->withoutOverlapping();
 
-// ── SYNC PESAN ──────────────────────────────────────────────────────────────
-// Ambil pesan baru dari Facebook Messenger & Instagram DM setiap 5 menit
+    \Log::info('SCHEDULER JALAN: ' . now());
+
+    $posts = Post::where('status', 'scheduled')->get();
+
+    \Log::info('JUMLAH POST SCHEDULED: ' . $posts->count());
+
+    foreach ($posts as $post) {
+
+        \Log::info('POST ID: ' . $post->id);
+        \Log::info('SCHEDULED AT: ' . $post->scheduled_at);
+        \Log::info('NOW: ' . now());
+
+        if ($post->scheduled_at <= now()) {
+
+            $post->update([
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+
+            \Log::info('POST BERHASIL DIPUBLISH');
+        }
+    }
+
+})->everyMinute()
+  ->name('auto-publish-posts');
+
+
+// ─────────────────────────────────────────────────────────────
+// REMINDER 60 MENIT SEBELUM PUBLISH
+// ─────────────────────────────────────────────────────────────
+Schedule::call(function () {
+
+    Post::where('status', 'scheduled')
+        ->whereBetween('scheduled_at', [
+            now()->addMinutes(59),
+            now()->addMinutes(60),
+        ])
+        ->get()
+        ->each(function (Post $post) {
+
+            CustomNotification::notifyUser(
+                $post->created_by,
+                '⏰ Jadwal Posting Mendekat',
+                'Posting ' . $post->platform . ' akan dipublikasikan dalam 60 menit.',
+                'info',
+                '/admin/posts'
+            );
+        });
+
+})->everyMinute()
+  ->name('post-reminder')
+  ->withoutOverlapping();
+
+
+// ─────────────────────────────────────────────────────────────
+// SYNC PESAN
+// ─────────────────────────────────────────────────────────────
 Schedule::job(new SyncMessagesJob)
     ->everyFiveMinutes()
     ->name('sync-messages')
     ->withoutOverlapping();
 
-// ── SYNC KOMENTAR ───────────────────────────────────────────────────────────
-// Ambil komentar baru dari semua post yang sudah dipublish setiap 5 menit
+
+// ─────────────────────────────────────────────────────────────
+// SYNC KOMENTAR
+// ─────────────────────────────────────────────────────────────
 Schedule::job(new SyncCommentsJob)
     ->everyFiveMinutes()
     ->name('sync-comments')
     ->withoutOverlapping();
 
-// ── SYNC METRICS ────────────────────────────────────────────────────────────
-// Update engagement metrics (likes, reach, dll) setiap jam
+
+// ─────────────────────────────────────────────────────────────
+// SYNC METRICS
+// ─────────────────────────────────────────────────────────────
 Schedule::job(new SyncMetricsJob)
     ->hourly()
     ->name('sync-metrics')
     ->withoutOverlapping();
 
-// ── REMINDER POSTING ────────────────────────────────────────────────────────
-// Kirim notifikasi 30 menit sebelum post dijadwalkan publish
+
+// ─────────────────────────────────────────────────────────────
+// TOKEN EXPIRY WARNING
+// ─────────────────────────────────────────────────────────────
 Schedule::call(function () {
-    Post::upcoming(30)
-        ->with('socialAccount')
+
+    SocialAccount::tokenExpiringSoon(7)
         ->get()
-        ->each(function (Post $post) {
-            CustomNotification::notifyUser(
-                $post->created_by,
-                'Reminder: Post Akan Dipublish ⏰',
-                'Post "' . substr($post->caption, 0, 50) . '..." akan dipublish dalam 30 menit di ' . ucfirst($post->platform),
-                'schedule',
-                '/admin/posts'
+        ->each(function ($account) {
+
+            CustomNotification::notifyAdmins(
+                'Token Akan Expired ⚠️',
+                'Token akun ' . $account->username .
+                ' (' . ucfirst($account->platform) . ')' .
+                ' akan expired pada ' .
+                $account->token_expired_at->format('d M Y'),
+                'warning',
+                '/admin/social-accounts'
             );
         });
-})->everyFiveMinutes()->name('post-reminder')->withoutOverlapping();
 
-// ── WARNING TOKEN HAMPIR EXPIRED ────────────────────────────────────────────
-// Kirim notifikasi jika token akun sosial akan expired dalam 7 hari
-Schedule::call(function () {
-    SocialAccount::tokenExpiringSoon(7)->get()->each(function ($account) {
-        CustomNotification::notifyAdmins(
-            'Token Akan Expired ⚠️',
-            'Token akun ' . $account->username . ' (' . ucfirst($account->platform) . ') akan expired pada ' . $account->token_expired_at->format('d M Y'),
-            'warning',
-            '/admin/social-accounts'
-        );
-    });
-})->daily()->name('token-expiry-warning');
+})->daily()
+  ->name('token-expiry-warning')
+  ->withoutOverlapping();
