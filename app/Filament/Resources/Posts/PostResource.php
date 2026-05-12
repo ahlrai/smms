@@ -14,6 +14,7 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -27,6 +28,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class PostResource extends Resource
 {
@@ -92,14 +94,24 @@ class PostResource extends Resource
             */
 
             Select::make('platform')
-            ->label('Platform')
-            ->options([
-            'facebook' => 'Facebook',
-            'instagram' => 'Instagram',
-            ])
-            ->required()
-            ->dehydrated()
-            ->disabled(),
+                ->label('Platform')
+                ->options([
+                    'facebook' => 'Facebook',
+                    'instagram' => 'Instagram',
+                ])
+                ->required()
+                ->dehydrated()
+                ->disabled(),
+
+            /*
+            |--------------------------------------------------------------------------
+            | TITLE
+            |--------------------------------------------------------------------------
+            */
+
+            TextInput::make('title')
+                ->label('Judul Postingan')
+                ->maxLength(255),
 
             /*
             |--------------------------------------------------------------------------
@@ -151,11 +163,11 @@ class PostResource extends Resource
             */
 
             FileUpload::make('media')
-            ->label('Upload Media (Gambar/Video)')
-            ->multiple()
-            ->image()
-            ->directory('post-media')
-            ->columnSpanFull(),
+                ->label('Upload Media (Gambar/Video)')
+                ->multiple()
+                ->image()
+                ->directory('post-media')
+                ->columnSpanFull(),
 
         ]);
     }
@@ -174,14 +186,20 @@ class PostResource extends Resource
 
                 /*
                 |--------------------------------------------------------------------------
-                | CAPTION
+                | TITLE
                 |--------------------------------------------------------------------------
                 */
 
-                TextColumn::make('caption')
-                    ->label('Caption')
-                    ->limit(60)
-                    ->searchable(),
+                TextColumn::make('title')
+                    ->label('Judul Postingan')
+                    ->formatStateUsing(function ($state, $record) {
+
+                        return $state
+                            ?: Str::words($record->caption, 5, '...');
+                    })
+                    ->searchable()
+                    ->sortable()
+                    ->wrap(),
 
                 /*
                 |--------------------------------------------------------------------------
@@ -355,7 +373,7 @@ class PostResource extends Resource
                 */
 
                 EditAction::make()
-                ->visible(fn (Post $record) => $record->status !== 'published'),
+                    ->visible(fn (Post $record) => $record->status !== 'published'),
 
                 /*
                 |--------------------------------------------------------------------------

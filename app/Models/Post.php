@@ -15,6 +15,7 @@ class Post extends Model
     protected $fillable = [
         'social_account_id',
         'platform',
+        'title',
         'caption',
         'status',
         'platform_post_id',
