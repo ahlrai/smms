@@ -163,11 +163,15 @@ class PostResource extends Resource
             */
 
             FileUpload::make('media')
-                ->label('Upload Media (Gambar/Video)')
-                ->multiple()
-                ->image()
-                ->directory('post-media')
-                ->columnSpanFull(),
+            ->label('Upload Media (Gambar/Video)')
+            ->multiple()
+            ->reorderable()
+            ->appendFiles()
+            ->image()
+            ->directory('post-media')
+            ->panelLayout('grid')
+            ->imagePreviewHeight('150')
+            ->columnSpanFull(),
 
         ]);
     }

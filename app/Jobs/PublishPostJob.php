@@ -35,10 +35,12 @@ class PublishPostJob implements ShouldQueue
 
         $account = $this->post->socialAccount;
 
-        $mediaUrls = $this->post->media
-            ->pluck('file_path')
-            ->map(fn ($path) => asset('storage/' . $path))
-            ->toArray();
+        $mediaUrls = $this->post->media()
+        ->orderBy('id', 'asc')
+        ->get()
+        ->pluck('file_path')
+        ->map(fn ($path) => asset('storage/' . $path))
+        ->toArray();
 
         try {
 
