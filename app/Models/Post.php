@@ -13,34 +13,46 @@ class Post extends Model
     use HasFactory;
 
     protected $fillable = [
-        'social_account_id',
-        'platform',
-        'title',
-        'caption',
-        'status',
-        'platform_post_id',
-        'scheduled_at',
-        'published_at',
-        'fail_reason',
-        'created_by',
+    'social_account_id',
+    'platform',
+    'title',
+    'caption',
+    'media',
+    'status',
+    'platform_post_id',
+    'scheduled_at',
+    'published_at',
+    'fail_reason',
+    'created_by',
     ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
         'published_at' => 'datetime',
+        'media' => 'array',
     ];
 
-    // 🔥 AUTO SET created_by (AMAN untuk web & tinker)
+    /*
+    |--------------------------------------------------------------------------
+    | AUTO CREATED BY
+    |--------------------------------------------------------------------------
+    */
+
     protected static function booted()
     {
         static::creating(function ($post) {
+
             if (!$post->created_by && auth()->check()) {
                 $post->created_by = auth()->id();
             }
         });
     }
 
-    // ── RELATIONS ──────────────────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONS
+    |--------------------------------------------------------------------------
+    */
 
     public function socialAccount(): BelongsTo
     {
@@ -52,7 +64,13 @@ class Post extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function media(): HasMany
+    /*
+    |--------------------------------------------------------------------------
+    | GANTI NAMA RELATION
+    |--------------------------------------------------------------------------
+    */
+
+    public function mediaFiles(): HasMany
     {
         return $this->hasMany(PostMedia::class)->orderBy('sort_order');
     }
@@ -67,21 +85,36 @@ class Post extends Model
         return $this->hasMany(Metric::class);
     }
 
-    // ── SCOPES ─────────────────────────────────────────────────
+    public function socialAccounts()
+    {
+        return $this->belongsToMany(
+            SocialAccount::class,
+            'post_social_accounts'
+        );
+    }
 
-    // Post yang sudah waktunya dipublish
+    public function postMedia()
+    {
+        return $this->hasMany(PostMedia::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SCOPES
+    |--------------------------------------------------------------------------
+    */
+
     public function scopeScheduled($query)
     {
         return $query->where('status', 'scheduled')
-                     ->where('scheduled_at', '<=', now());
+            ->where('scheduled_at', '<=', now());
     }
 
-    // Post yang akan publish dalam X menit (untuk notifikasi)
     public function scopeUpcoming($query, int $minutes = 30)
     {
         return $query->where('status', 'scheduled')
-                     ->where('scheduled_at', '>', now())
-                     ->where('scheduled_at', '<=', now()->addMinutes($minutes));
+            ->where('scheduled_at', '>', now())
+            ->where('scheduled_at', '<=', now()->addMinutes($minutes));
     }
 
     public function scopeDraft($query)
@@ -109,27 +142,51 @@ class Post extends Model
         return $query->where('platform', 'instagram');
     }
 
-    // ── ACCESSOR (🔥 TAMBAHAN PENTING) ─────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | ACCESSOR
+    |--------------------------------------------------------------------------
+    */
 
     protected function captionPreview(): Attribute
     {
         return Attribute::make(
-            get: fn () => strlen($this->caption) > 50
+            get: fn() =>
+            strlen($this->caption) > 50
                 ? substr($this->caption, 0, 50) . '...'
                 : $this->caption
         );
     }
 
-    // ── HELPERS ────────────────────────────────────────────────
+    /*
+    |--------------------------------------------------------------------------
+    | HELPERS
+    |--------------------------------------------------------------------------
+    */
 
-    public function isDraft(): bool     { return $this->status === 'draft'; }
-    public function isScheduled(): bool { return $this->status === 'scheduled'; }
-    public function isPublished(): bool { return $this->status === 'published'; }
-    public function isFailed(): bool    { return $this->status === 'failed'; }
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft';
+    }
+
+    public function isScheduled(): bool
+    {
+        return $this->status === 'scheduled';
+    }
+
+    public function isPublished(): bool
+    {
+        return $this->status === 'published';
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === 'failed';
+    }
 
     public function hasMedia(): bool
     {
-        return $this->media()->exists();
+        return !empty($this->media);
     }
 
     public function getStatusColorAttribute(): string
@@ -137,35 +194,26 @@ class Post extends Model
         return match ($this->status) {
             'published' => 'success',
             'scheduled' => 'warning',
-            'failed'    => 'danger',
-            default     => 'secondary',
+            'failed' => 'danger',
+            default => 'secondary',
         };
     }
 
     public function markAsPublished(string $platformPostId): void
     {
         $this->update([
-            'status'           => 'published',
+            'status' => 'published',
             'platform_post_id' => $platformPostId,
-            'published_at'     => now(),
-            'fail_reason'      => null,
+            'published_at' => now(),
+            'fail_reason' => null,
         ]);
     }
 
     public function markAsFailed(string $reason): void
     {
         $this->update([
-            'status'      => 'failed',
+            'status' => 'failed',
             'fail_reason' => $reason,
         ]);
     }
-
-    public function socialAccounts()
-{
-    return $this->belongsToMany(
-        SocialAccount::class,
-        'post_social_accounts'
-    );
-}
-
 }
