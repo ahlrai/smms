@@ -7,6 +7,8 @@ use App\Jobs\PublishPostJob;
 use App\Models\Post;
 use App\Models\SocialAccount;
 
+use Cloudinary\Cloudinary;
+
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 
@@ -70,8 +72,7 @@ class PostResource extends Resource
 
             if (
                 strtolower($acc->platform)
-                !==
-                'instagram'
+                !== 'instagram'
             ) {
                 continue;
             }
@@ -80,9 +81,15 @@ class PostResource extends Resource
 
             $igId = $acc->account_id;
 
-            $media = $post->media[0] ?? null;
+            /*
+            |--------------------------------------------------------------------------
+            | AMBIL SEMUA MEDIA
+            |--------------------------------------------------------------------------
+            */
 
-            if (!$media) {
+            $allMedia = $post->media;
+
+            if (empty($allMedia)) {
 
                 return [
                     'success' => false,
@@ -90,63 +97,250 @@ class PostResource extends Resource
                 ];
             }
 
-            $media =
-                str_replace(
-                    'storage/',
-                    '',
-                    $media
-                );
+            /*
+            |--------------------------------------------------------------------------
+            | CLOUDINARY
+            |--------------------------------------------------------------------------
+            */
 
-            $imageUrl =
+            $cloudinary = new \Cloudinary\Cloudinary([
 
-                'https://untamed-uncross-shorty.ngrok-free.dev'
+                'cloud' => [
 
-                .
-                '/storage/'
-                .
-                $media;
+                    'cloud_name' =>
+                    env('CLOUDINARY_CLOUD_NAME'),
 
-            $container = Http::post(
+                    'api_key' =>
+                    env('CLOUDINARY_API_KEY'),
+
+                    'api_secret' =>
+                    env('CLOUDINARY_API_SECRET'),
+
+                ],
+
+                'url' => [
+                    'secure' => true,
+                ],
+
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | SINGLE IMAGE
+            |--------------------------------------------------------------------------
+            */
+
+            if (count($allMedia) === 1) {
+
+                $media =
+                    str_replace(
+                        'storage/',
+                        '',
+                        $allMedia[0]
+                    );
+
+                $upload =
+                    $cloudinary->uploadApi()->upload(
+                        public_path('storage/' . $media)
+                    );
+
+                $uploadedFileUrl =
+                    $upload['secure_url'];
+
+                $container = Http::post(
+
+                    "https://graph.facebook.com/v22.0/$igId/media",
+
+                    [
+
+                        'image_url' =>
+                        $uploadedFileUrl,
+
+                        'caption' =>
+                        $post->caption,
+
+                        'access_token' =>
+                        $token,
+
+                    ]
+
+                )->json();
+
+                if (isset($container['error'])) {
+
+                    return [
+
+                        'success' => false,
+
+                        'message' =>
+                        $container['error']['message']
+
+                    ];
+                }
+
+                sleep(5);
+
+                $publish = Http::post(
+
+                    "https://graph.facebook.com/v22.0/$igId/media_publish",
+
+                    [
+
+                        'creation_id' =>
+                        $container['id'],
+
+                        'access_token' =>
+                        $token,
+
+                    ]
+
+                )->json();
+
+                if (isset($publish['error'])) {
+
+                    return [
+
+                        'success' => false,
+
+                        'message' =>
+                        $publish['error']['message']
+
+                    ];
+                }
+
+                return [
+                    'success' => true
+                ];
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | CAROUSEL
+            |--------------------------------------------------------------------------
+            */
+
+            $children = [];
+
+            foreach ($allMedia as $media) {
+
+                $media =
+                    str_replace(
+                        'storage/',
+                        '',
+                        $media
+                    );
+
+                $upload =
+                    $cloudinary->uploadApi()->upload(
+                        public_path('storage/' . $media)
+                    );
+
+                $uploadedFileUrl =
+                    $upload['secure_url'];
+
+                /*
+                |--------------------------------------------------------------------------
+                | CHILD CONTAINER
+                |--------------------------------------------------------------------------
+                */
+
+                $child = Http::post(
+
+                    "https://graph.facebook.com/v22.0/$igId/media",
+
+                    [
+
+                        'image_url' =>
+                        $uploadedFileUrl,
+
+                        'is_carousel_item' =>
+                        true,
+
+                        'access_token' =>
+                        $token,
+
+                    ]
+
+                )->json();
+
+                if (isset($child['error'])) {
+
+                    return [
+
+                        'success' => false,
+
+                        'message' =>
+                        $child['error']['message']
+
+                    ];
+                }
+
+                $children[] = $child['id'];
+            }
+
+            sleep(5);
+
+            /*
+            |--------------------------------------------------------------------------
+            | CAROUSEL CONTAINER
+            |--------------------------------------------------------------------------
+            */
+
+            $carousel = Http::post(
+
                 "https://graph.facebook.com/v22.0/$igId/media",
+
                 [
 
-                    'image_url' =>
+                    'media_type' => 'CAROUSEL',
 
-'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200',
+                    'children' => implode(',', $children),
 
                     'caption' => $post->caption,
 
                     'access_token' => $token,
+
                 ]
+
             )->json();
 
-            if (
-                isset($container['error'])
-            ) {
+            if (isset($carousel['error'])) {
 
                 return [
 
                     'success' => false,
 
                     'message' =>
-                    $container['error']['message']
+                    $carousel['error']['message']
+
                 ];
             }
 
+            sleep(5);
+
+            /*
+            |--------------------------------------------------------------------------
+            | PUBLISH CAROUSEL
+            |--------------------------------------------------------------------------
+            */
+
             $publish = Http::post(
+
                 "https://graph.facebook.com/v22.0/$igId/media_publish",
+
                 [
 
                     'creation_id' =>
-                    $container['id'],
+                    $carousel['id'],
 
-                    'access_token' => $token,
+                    'access_token' =>
+                    $token,
+
                 ]
+
             )->json();
 
-            if (
-                isset($publish['error'])
-            ) {
+            if (isset($publish['error'])) {
 
                 return [
 
@@ -154,6 +348,7 @@ class PostResource extends Resource
 
                     'message' =>
                     $publish['error']['message']
+
                 ];
             }
 
@@ -163,8 +358,12 @@ class PostResource extends Resource
         }
 
         return [
+
             'success' => false,
-            'message' => 'Akun instagram tidak ditemukan'
+
+            'message' =>
+            'Akun instagram tidak ditemukan'
+
         ];
     }
 

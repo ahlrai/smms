@@ -1,0 +1,41 @@
+/* CONTENT FULL WIDTH */
+.fi-main {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* PAGE CONTENT */
+.fi-page {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* TABLE WRAPPER */
+.fi-ta {
+    width: 100% !important;
+}
+
+/* TABLE CONTAINER */
+.fi-ta-content {
+    width: 100% !important;
+    overflow-x: auto;
+}
+
+/* CARD */
+.fi-section,
+.fi-card {
+    width: 100% !important;
+}
+
+/* FORM */
+.fi-fo {
+    width: 100% !important;
+}
+
+/* RESPONSIVE SPACE */
+@media (max-width: 1024px) {
+    .fi-main {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}

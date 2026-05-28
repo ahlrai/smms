@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SocialAccount;
+
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -12,7 +13,10 @@ class InstagramService
 
     public function __construct()
     {
-        $version = config('services.facebook.graph_version', 'v22.0');
+        $version = config(
+            'services.facebook.graph_version',
+            'v22.0'
+        );
 
         $this->baseUrl =
             'https://graph.facebook.com/' . $version;
@@ -20,33 +24,30 @@ class InstagramService
 
     /*
     |--------------------------------------------------------------------------
-    | OAUTH INSTAGRAM
+    | OAUTH URL
     |--------------------------------------------------------------------------
     */
 
     public function getOAuthUrl(): string
     {
         $params = http_build_query([
-            'client_id' => config('services.facebook.app_id'),
+
+            'client_id' =>
+                config('services.facebook.app_id'),
 
             'redirect_uri' =>
                 config('services.instagram.callback_url'),
 
             'scope' => implode(',', [
 
-                // WAJIB
                 'instagram_basic',
 
-                // publish konten
                 'instagram_content_publish',
 
-                // komentar
                 'instagram_manage_comments',
 
-                // DM
                 'instagram_manage_messages',
 
-                // akses halaman FB
                 'pages_show_list',
 
             ]),
@@ -61,10 +62,9 @@ class InstagramService
             . $params;
     }
 
-
     /*
     |--------------------------------------------------------------------------
-    | GET IG ACCOUNT
+    | GET INSTAGRAM ACCOUNT ID
     |--------------------------------------------------------------------------
     */
 
@@ -75,36 +75,32 @@ class InstagramService
 
         try {
 
-            $response =
-                Http::get(
-                    $this->baseUrl . '/' . $pageId,
-                    [
+            $response = Http::get(
+                $this->baseUrl . '/' . $pageId,
+                [
 
-                        'fields' =>
-                            'instagram_business_account',
+                    'fields' =>
+                        'instagram_business_account',
 
-                        'access_token' =>
-                            $pageToken,
+                    'access_token' =>
+                        $pageToken,
+                ]
+            );
 
-                    ]
-                );
-
-            return
-                $response->json(
-                    'instagram_business_account.id'
-                );
+            return $response->json(
+                'instagram_business_account.id'
+            );
 
         } catch (\Exception $e) {
 
             Log::error(
                 'IG Account Error: '
-                . $e->getMessage()
+                    . $e->getMessage()
             );
 
             return null;
         }
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -120,8 +116,8 @@ class InstagramService
 
             return Http::get(
                 $this->baseUrl
-                . '/'
-                . $account->account_id,
+                    . '/'
+                    . $account->account_id,
 
                 [
 
@@ -130,26 +126,21 @@ class InstagramService
 
                     'access_token' =>
                         $account->access_token,
-
                 ]
 
             )->json();
 
         } catch (\Exception $e) {
 
-            Log::error(
-                $e->getMessage()
-            );
+            Log::error($e->getMessage());
 
             return [];
         }
     }
 
-
-
     /*
     |--------------------------------------------------------------------------
-    | PUBLISH IMAGE
+    | PUBLISH SINGLE PHOTO
     |--------------------------------------------------------------------------
     */
 
@@ -161,48 +152,69 @@ class InstagramService
 
         try {
 
-            $container =
-                Http::post(
+            /*
+            |--------------------------------------------------------------------------
+            | CREATE CONTAINER
+            |--------------------------------------------------------------------------
+            */
 
-                    $this->baseUrl
+            $container = Http::post(
+
+                $this->baseUrl
                     . '/'
                     . $account->account_id
                     . '/media',
 
-                    [
+                [
 
-                        'image_url' =>
-                            $imageUrl,
+                    'image_url' =>
+                        $imageUrl,
 
-                        'caption' =>
-                            $caption,
+                    'caption' =>
+                        $caption,
 
-                        'access_token' =>
-                            $account->access_token,
+                    'access_token' =>
+                        $account->access_token,
+                ]
 
-                    ]
+            )->json();
 
-                )->json();
-
+            /*
+            |--------------------------------------------------------------------------
+            | VALIDASI CONTAINER
+            |--------------------------------------------------------------------------
+            */
 
             if (!isset($container['id'])) {
 
-                return [
-                    'error' =>
-                        'Container gagal dibuat'
-                ];
+                throw new \Exception(
+
+                    $container['error']['message']
+
+                    ?? 'Gagal membuat Instagram media container.'
+                );
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | DELAY
+            |--------------------------------------------------------------------------
+            */
 
-            sleep(2);
+            sleep(5);
 
+            /*
+            |--------------------------------------------------------------------------
+            | PUBLISH
+            |--------------------------------------------------------------------------
+            */
 
-            return Http::post(
+            $publish = Http::post(
 
                 $this->baseUrl
-                . '/'
-                . $account->account_id
-                . '/media_publish',
+                    . '/'
+                    . $account->account_id
+                    . '/media_publish',
 
                 [
 
@@ -211,25 +223,207 @@ class InstagramService
 
                     'access_token' =>
                         $account->access_token,
-
                 ]
 
             )->json();
 
-        }
+            /*
+            |--------------------------------------------------------------------------
+            | VALIDASI PUBLISH
+            |--------------------------------------------------------------------------
+            */
 
-        catch (\Exception $e) {
+            if (!isset($publish['id'])) {
+
+                throw new \Exception(
+
+                    $publish['error']['message']
+
+                    ?? 'Gagal publish Instagram post.'
+                );
+            }
+
+            return $publish;
+
+        } catch (\Exception $e) {
+
+            Log::error(
+                'IG Publish Photo Error: '
+                    . $e->getMessage()
+            );
 
             return [
 
-                'error' =>
-                    $e->getMessage()
-
+                'error' => [
+                    'message' => $e->getMessage()
+                ]
             ];
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | PUBLISH CAROUSEL
+    |--------------------------------------------------------------------------
+    */
 
+    public function publishCarousel(
+        SocialAccount $account,
+        array $mediaUrls,
+        string $caption
+    ): array {
+
+        try {
+
+            $children = [];
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREATE CHILD CONTAINER
+            |--------------------------------------------------------------------------
+            */
+
+            foreach ($mediaUrls as $url) {
+
+                $child = Http::post(
+
+                    $this->baseUrl
+                        . '/'
+                        . $account->account_id
+                        . '/media',
+
+                    [
+
+                        'image_url' =>
+                            $url,
+
+                        'is_carousel_item' =>
+                            true,
+
+                        'access_token' =>
+                            $account->access_token,
+                    ]
+
+                )->json();
+
+                if (!isset($child['id'])) {
+
+                    throw new \Exception(
+
+                        $child['error']['message']
+
+                        ?? 'Gagal membuat child container.'
+                    );
+                }
+
+                $children[] = $child['id'];
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | CREATE CAROUSEL CONTAINER
+            |--------------------------------------------------------------------------
+            */
+
+            $container = Http::post(
+
+                $this->baseUrl
+                    . '/'
+                    . $account->account_id
+                    . '/media',
+
+                [
+
+                    'media_type' =>
+                        'CAROUSEL',
+
+                    'children' =>
+                        implode(',', $children),
+
+                    'caption' =>
+                        $caption,
+
+                    'access_token' =>
+                        $account->access_token,
+                ]
+
+            )->json();
+
+            if (!isset($container['id'])) {
+
+                throw new \Exception(
+
+                    $container['error']['message']
+
+                    ?? 'Gagal membuat carousel container.'
+                );
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | DELAY
+            |--------------------------------------------------------------------------
+            */
+
+            sleep(5);
+
+            /*
+            |--------------------------------------------------------------------------
+            | PUBLISH CAROUSEL
+            |--------------------------------------------------------------------------
+            */
+
+            $publish = Http::post(
+
+                $this->baseUrl
+                    . '/'
+                    . $account->account_id
+                    . '/media_publish',
+
+                [
+
+                    'creation_id' =>
+                        $container['id'],
+
+                    'access_token' =>
+                        $account->access_token,
+                ]
+
+            )->json();
+
+            /*
+            |--------------------------------------------------------------------------
+            | VALIDASI PUBLISH
+            |--------------------------------------------------------------------------
+            */
+
+            if (!isset($publish['id'])) {
+
+                throw new \Exception(
+
+                    $publish['error']['message']
+
+                    ?? 'Gagal publish carousel Instagram.'
+                );
+            }
+
+            return $publish;
+
+        } catch (\Exception $e) {
+
+            Log::error(
+                'IG Carousel Error: '
+                    . $e->getMessage()
+            );
+
+            return [
+
+                'error' => [
+                    'message' => $e->getMessage()
+                ]
+            ];
+        }
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -245,9 +439,9 @@ class InstagramService
         return Http::get(
 
             $this->baseUrl
-            . '/'
-            . $mediaId
-            . '/comments',
+                . '/'
+                . $mediaId
+                . '/comments',
 
             [
 
@@ -256,13 +450,10 @@ class InstagramService
 
                 'access_token' =>
                     $account->access_token,
-
             ]
 
         )->json('data', []);
     }
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -277,9 +468,9 @@ class InstagramService
         return Http::get(
 
             $this->baseUrl
-            . '/'
-            . $account->account_id
-            . '/conversations',
+                . '/'
+                . $account->account_id
+                . '/conversations',
 
             [
 
@@ -291,13 +482,10 @@ class InstagramService
 
                 'access_token' =>
                     $account->access_token,
-
             ]
 
         )->json('data', []);
     }
-
-
 
     /*
     |--------------------------------------------------------------------------
@@ -312,9 +500,9 @@ class InstagramService
         return Http::get(
 
             $this->baseUrl
-            . '/'
-            . $account->account_id
-            . '/media',
+                . '/'
+                . $account->account_id
+                . '/media',
 
             [
 
@@ -323,34 +511,37 @@ class InstagramService
 
                 'access_token' =>
                     $account->access_token,
-
             ]
 
         )->json('data', []);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | GET PROFILE BY ID
+    |--------------------------------------------------------------------------
+    */
+
     public function getProfileById(
-    string $igId,
-    string $token
-): array {
+        string $igId,
+        string $token
+    ): array {
 
-    return Http::get(
+        return Http::get(
 
-        $this->baseUrl .
-        '/' .
-        $igId,
+            $this->baseUrl
+                . '/'
+                . $igId,
 
-        [
+            [
 
-            'fields' =>
-            'id,username,name',
+                'fields' =>
+                    'id,username,name',
 
-            'access_token' =>
-            $token
+                'access_token' =>
+                    $token
+            ]
 
-        ]
-
-    )->json();
-}
-
+        )->json();
+    }
 }
