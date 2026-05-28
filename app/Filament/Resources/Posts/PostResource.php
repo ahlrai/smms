@@ -28,8 +28,10 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class PostResource extends Resource
 {
@@ -54,6 +56,116 @@ class PostResource extends Resource
         $data['created_by'] = Auth::id();
 
         return $data;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PUBLISH INSTAGRAM
+    |--------------------------------------------------------------------------
+    */
+
+    public static function publishInstagram(Post $post)
+    {
+        foreach ($post->socialAccounts as $acc) {
+
+            if (
+                strtolower($acc->platform)
+                !==
+                'instagram'
+            ) {
+                continue;
+            }
+
+            $token = $acc->access_token;
+
+            $igId = $acc->account_id;
+
+            $media = $post->media[0] ?? null;
+
+            if (!$media) {
+
+                return [
+                    'success' => false,
+                    'message' => 'Media tidak ditemukan'
+                ];
+            }
+
+            $media =
+                str_replace(
+                    'storage/',
+                    '',
+                    $media
+                );
+
+            $imageUrl =
+
+                'https://untamed-uncross-shorty.ngrok-free.dev'
+
+                .
+                '/storage/'
+                .
+                $media;
+
+            $container = Http::post(
+                "https://graph.facebook.com/v22.0/$igId/media",
+                [
+
+                    'image_url' =>
+
+'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200',
+
+                    'caption' => $post->caption,
+
+                    'access_token' => $token,
+                ]
+            )->json();
+
+            if (
+                isset($container['error'])
+            ) {
+
+                return [
+
+                    'success' => false,
+
+                    'message' =>
+                    $container['error']['message']
+                ];
+            }
+
+            $publish = Http::post(
+                "https://graph.facebook.com/v22.0/$igId/media_publish",
+                [
+
+                    'creation_id' =>
+                    $container['id'],
+
+                    'access_token' => $token,
+                ]
+            )->json();
+
+            if (
+                isset($publish['error'])
+            ) {
+
+                return [
+
+                    'success' => false,
+
+                    'message' =>
+                    $publish['error']['message']
+                ];
+            }
+
+            return [
+                'success' => true
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Akun instagram tidak ditemukan'
+        ];
     }
 
     /*
@@ -127,17 +239,55 @@ class PostResource extends Resource
                 ),
 
             FileUpload::make('media')
-                ->label('Upload Media (Gambar/Video)')
+
+                ->label('Upload Media')
+
                 ->multiple()
-                ->reorderable()
-                ->appendFiles()
-                ->image()
+
                 ->disk('public')
+
                 ->directory('post-media')
+
                 ->visibility('public')
-                ->preserveFilenames()
+
+                ->imagePreviewHeight('200')
+
                 ->panelLayout('grid')
-                ->imagePreviewHeight('150')
+
+                ->preserveFilenames()
+
+                ->openable()
+
+                ->downloadable()
+
+                ->reorderable()
+
+                ->appendFiles()
+
+                ->acceptedFileTypes([
+
+                    'image/jpeg',
+
+                    'image/png',
+
+                    'video/mp4'
+
+                ])
+
+                ->getUploadedFileNameForStorageUsing(
+                    fn($file) =>
+
+                    time()
+                        . '_'
+                        .
+                        Str::random(10)
+                        .
+                        '.'
+                        .
+                        $file->getClientOriginalExtension()
+
+                )
+
                 ->columnSpanFull(),
 
         ]);
@@ -261,354 +411,53 @@ class PostResource extends Resource
                     )
                     ->action(function (Post $record) {
 
-                        PublishPostJob::dispatch($record);
+                        $result =
+                            self::publishInstagram($record);
 
-                        Notification::make()
-                            ->title('Post masuk queue publish!')
-                            ->body(
-                                'Post akan segera dipublish ke '
-                                    . ucfirst($record->platform)
-                            )
-                            ->success()
-                            ->send();
+                        if ($result['success']) {
+
+                            $record->update([
+
+                                'status' => 'published',
+
+                                'published_at' => now(),
+                            ]);
+
+                            Notification::make()
+
+                                ->title(
+                                    'Post berhasil dipublish'
+                                )
+
+                                ->success()
+
+                                ->send();
+
+                        } else {
+
+                            $record->update([
+
+                                'status' => 'failed',
+                            ]);
+
+                            Notification::make()
+
+                                ->title(
+                                    'Publish gagal'
+                                )
+
+                                ->body(
+                                    $result['message']
+                                )
+
+                                ->danger()
+
+                                ->send();
+                        }
                     }),
 
                 EditAction::make()
                     ->visible(fn(Post $record) => $record->status !== 'published'),
-
-                /*
-                |--------------------------------------------------------------------------
-                | PREVIEW
-                |--------------------------------------------------------------------------
-                */
-
-                Action::make('preview')
-                    ->label('Preview')
-                    ->icon('heroicon-o-eye')
-                    ->color('info')
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Tutup')
-                    ->modalWidth('7xl')
-                    ->modalHeading('Preview Postingan')
-
-                    ->modalContent(function (Post $record) {
-
-                    $accounts = $record->socialAccounts;
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | AMBIL MEDIA DARI KOLOM media
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $formattedMedia = [];
-
-                    $mediaFiles = $record->media ?? [];
-
-                    foreach ($mediaFiles as $media) {
-
-                        if (!$media) {
-                            continue;
-                        }
-
-                        $media = str_replace('\\', '/', $media);
-
-                        $media = ltrim($media, '/');
-
-                        $media = str_replace('storage/', '', $media);
-
-                        $formattedMedia[] = asset('storage/' . $media);
-                    }
-
-                    $totalMedia = count($formattedMedia);
-
-                    $html = '
-                    <div style="
-                        display:flex;
-                        gap:30px;
-                        flex-wrap:wrap;
-                        align-items:flex-start;
-                    ">
-                    ';
-
-                    foreach ($accounts as $account) {
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | INSTAGRAM
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (strtolower($account->platform) == 'instagram') {
-
-                            $postDate = $record->published_at
-                                ? \Carbon\Carbon::parse($record->published_at)
-                                    ->translatedFormat('j F')
-                                : now()->translatedFormat('j F');
-
-                            $html .= '
-                            <div style="
-                                width:380px;
-                                background:white;
-                                border-radius:12px;
-                                overflow:hidden;
-                                border:1px solid #dbdbdb;
-                                font-family:Arial,sans-serif;
-                            ">
-
-                                <div style="
-                                    display:flex;
-                                    justify-content:space-between;
-                                    align-items:center;
-                                    padding:12px 14px;
-                                ">
-
-                                    <div style="
-                                        display:flex;
-                                        align-items:center;
-                                        gap:10px;
-                                    ">
-
-                                        <img
-                                            src="https://ui-avatars.com/api/?name=' . $account->username . '&background=random"
-                                            style="
-                                                width:34px;
-                                                height:34px;
-                                                border-radius:50%;
-                                                object-fit:cover;
-                                            "
-                                        >
-
-                                        <div style="
-                                            font-size:14px;
-                                            font-weight:600;
-                                            color:#262626;
-                                        ">
-                                            ' . $account->username . '
-                                        </div>
-
-                                    </div>
-
-                                    <div style="font-size:20px;">
-                                        •••
-                                    </div>
-
-                                </div>
-
-                                <div style="
-                                    display:flex;
-                                    overflow-x:auto;
-                                ">
-                            ';
-
-                            foreach ($formattedMedia as $imageUrl) {
-
-                                $html .= '
-                                <img
-                                    src="' . $imageUrl . '"
-                                    style="
-                                        width:100%;
-                                        aspect-ratio:4/5;
-                                        object-fit:cover;
-                                        flex-shrink:0;
-                                        display:block;
-                                    "
-                                >
-                                ';
-                            }
-
-                            $html .= '
-                                </div>
-
-                                <div style="
-                                    display:flex;
-                                    justify-content:space-between;
-                                    align-items:center;
-                                    padding:10px 14px;
-                                ">
-
-                                    <div style="
-                                        display:flex;
-                                        gap:18px;
-                                        font-size:24px;
-                                    ">
-                                        <span>🤍</span>
-                                        <span>💬</span>
-                                        <span>📤</span>
-                                    </div>
-
-                                    <span style="font-size:24px;">
-                                        🔖
-                                    </span>
-
-                                </div>
-
-                                <div style="
-                                    padding:0 14px;
-                                    font-size:15px;
-                                    font-weight:600;
-                                    color:#262626;
-                                ">
-                                    Disukai oleh pengguna lain
-                                </div>
-
-                                <div style="
-                                    padding:8px 14px 0;
-                                    font-size:15px;
-                                    line-height:1.5;
-                                    color:#262626;
-                                ">
-
-                                    <strong>' . $account->username . '</strong>
-
-                                    ' . $record->caption . '
-
-                                </div>
-
-                                <div style="
-                                    padding:10px 14px 16px;
-                                    font-size:12px;
-                                    color:#8e8e8e;
-                                    text-transform:uppercase;
-                                ">
-                                    ' . $postDate . '
-                                </div>
-
-                            </div>
-                            ';
-                        }
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | FACEBOOK
-                        |--------------------------------------------------------------------------
-                        */
-
-                        if (strtolower($account->platform) == 'facebook') {
-
-                            $postTime = $record->published_at
-                                ? \Carbon\Carbon::parse($record->published_at)
-                                    ->format('d M Y H:i')
-                                : now()->format('d M Y H:i');
-
-                            $html .= '
-                            <div style="
-                                width:420px;
-                                background:#f0f2f5;
-                                padding:20px;
-                                border-radius:18px;
-                                font-family:Arial,sans-serif;
-                            ">
-
-                                <div style="
-                                    background:white;
-                                    border-radius:14px;
-                                    overflow:hidden;
-                                    box-shadow:0 1px 3px rgba(0,0,0,.12);
-                                ">
-
-                                    <div style="
-                                        display:flex;
-                                        gap:12px;
-                                        align-items:center;
-                                        padding:14px;
-                                    ">
-
-                                        <img
-                                            src="https://ui-avatars.com/api/?name=' . $account->username . '&background=random"
-                                            style="
-                                                width:48px;
-                                                height:48px;
-                                                border-radius:50%;
-                                                object-fit:cover;
-                                            "
-                                        >
-
-                                        <div>
-
-                                            <div style="
-                                                font-size:18px;
-                                                font-weight:700;
-                                                color:#050505;
-                                            ">
-                                                ' . $account->username . '
-                                            </div>
-
-                                            <div style="
-                                                font-size:14px;
-                                                color:#65676b;
-                                                margin-top:2px;
-                                            ">
-                                                ' . $postTime . '
-                                            </div>
-
-                                        </div>
-
-                                    </div>
-
-                                    <div style="
-                                        padding:0 14px 14px;
-                                        font-size:17px;
-                                        line-height:1.5;
-                                        color:#050505;
-                                    ">
-                                        ' . $record->caption . '
-                                    </div>
-
-                                    <div style="
-                                        display:flex;
-                                        overflow-x:auto;
-                                    ">
-                            ';
-
-                            foreach ($formattedMedia as $imageUrl) {
-
-                                $html .= '
-                                <img
-                                    src="' . $imageUrl . '"
-                                    style="
-                                        width:100%;
-                                        max-height:700px;
-                                        object-fit:cover;
-                                        flex-shrink:0;
-                                        display:block;
-                                    "
-                                >
-                                ';
-                            }
-
-                            $html .= '
-                                    </div>
-
-                                    <div style="
-                                        border-top:1px solid #ddd;
-                                        display:flex;
-                                        justify-content:space-around;
-                                        padding:14px 10px;
-                                        font-size:15px;
-                                        color:#65676b;
-                                        font-weight:600;
-                                    ">
-
-                                        <div>👍 Suka</div>
-
-                                        <div>💬 Komentar</div>
-
-                                        <div>↗ Bagikan</div>
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-                            ';
-                        }
-                    }
-
-                    $html .= '</div>';
-
-                    return new HtmlString($html);
-                }),
 
                 DeleteAction::make(),
 
