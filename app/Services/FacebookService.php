@@ -415,4 +415,36 @@ class FacebookService
             return [];
         }
     }
+
+        public function fetchConversations($account): array
+{
+    try {
+
+        $response = Http::get(
+            $this->baseUrl . '/' . $account->account_id . '/conversations',
+            [
+                'fields' =>
+                    'participants,messages{id,message,from,created_time}',
+                'access_token' =>
+                    $account->access_token,
+            ]
+        );
+
+        Log::info(
+            'FB CONVERSATIONS',
+            $response->json()
+        );
+
+        return $response->json('data', []);
+
+    } catch (\Exception $e) {
+
+        Log::error(
+            'FB CONVERSATION ERROR: ' .
+            $e->getMessage()
+        );
+
+        return [];
+    }
+}
 }

@@ -544,4 +544,96 @@ class InstagramService
 
         )->json();
     }
+
+public function getPostPermalink(
+    string $mediaId,
+    string $token
+): ?string {
+
+    $response = Http::get(
+
+        $this->baseUrl .
+        '/' .
+        $mediaId,
+
+        [
+
+            'fields' =>
+                'permalink',
+
+            'access_token' =>
+                $token,
+
+        ]
+
+    )->json();
+
+    return $response['permalink'] ?? null;
+}
+
+public function sendMessage(
+    string $recipientId,
+    string $message,
+    string $token
+): array {
+
+    $response = Http::post(
+        $this->baseUrl . '/me/messages',
+        [
+            'recipient' => [
+                'id' => $recipientId,
+            ],
+            'message' => [
+                'text' => $message,
+            ],
+            'messaging_type' => 'RESPONSE',
+            'access_token' => $token,
+        ]
+    );
+
+    Log::info('IG SEND MESSAGE', [
+        'response' => $response->json(),
+    ]);
+
+    return $response->json();
+}
+
+public function getUsername(
+    string $userId,
+    string $token
+): ?string {
+
+    try {
+
+        $response = Http::get(
+            $this->baseUrl . '/' . $userId,
+            [
+                'fields' =>
+                    'username,name',
+
+                'access_token' =>
+                    $token,
+            ]
+        );
+
+        Log::info(
+            'IG USER PROFILE',
+            $response->json()
+        );
+
+        return
+            $response->json('username')
+            ??
+            $response->json('name');
+
+    } catch (\Exception $e) {
+
+        Log::error(
+            'GET USERNAME ERROR: '
+            . $e->getMessage()
+        );
+
+        return null;
+    }
+}
 }

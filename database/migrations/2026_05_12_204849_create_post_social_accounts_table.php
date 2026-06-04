@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     public function up(): void
-    {
+{
+    if (!Schema::hasTable('post_social_accounts')) {
+
         Schema::create('post_social_accounts', function (Blueprint $table) {
 
             $table->id();
@@ -23,6 +25,7 @@ return new class extends Migration
             $table->timestamps();
         });
     }
+}
 
     public function down(): void
     {

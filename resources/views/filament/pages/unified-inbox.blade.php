@@ -111,14 +111,14 @@
                     <div class="inbox-item {{ $selectedId === $msg->id ? 'active' : '' }} {{ !$msg->is_read ? 'unread' : '' }}"
                          wire:click="selectMessage({{ $msg->id }})">
                         <div class="inbox-avatar inbox-avatar-{{ $msg->platform }}">
-                            {{ strtoupper(substr($msg->sender_username, 0, 1)) }}
+                            {{ strtoupper(substr($msg->sender_username ?: $msg->sender_id, 0, 1)) }}
                             @if (!$msg->is_read)
                                 <span class="unread-dot"></span>
                             @endif
                         </div>
                         <div class="inbox-meta">
                             <div class="inbox-name">
-                                <span>{{ $msg->sender_username }}</span>
+                                <span>{{ $msg->sender_username ?: $msg->sender_id }}</span>
                                 <span class="inbox-time">{{ $msg->sent_at?->diffForHumans(short: true) }}</span>
                             </div>
                             <div class="inbox-badges">
@@ -150,10 +150,12 @@
                 <div class="conv-header">
                     <div class="conv-user">
                         <div class="inbox-avatar inbox-avatar-{{ $selected->platform }}" style="width:36px;height:36px;font-size:13px;">
-                            {{ strtoupper(substr($selected->sender_username, 0, 1)) }}
+                            {{ strtoupper(substr($selected->sender_username ?: $selected->sender_id, 0, 1)) }}
                         </div>
                         <div>
-                            <div class="conv-name">{{ $selected->sender_username }}</div>
+                            <div class="conv-name">
+                                {{ $selected->sender_username ?: $selected->sender_id }}
+                            </div>
                             <div class="conv-sub">
                                 {{ ucfirst($selected->platform) }}
                                 &bull;

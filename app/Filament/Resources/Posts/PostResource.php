@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Posts;
 
 use App\Filament\Resources\Posts\Pages;
-use App\Jobs\PublishPostJob;
 use App\Models\Post;
 use App\Models\SocialAccount;
 
@@ -31,9 +30,8 @@ use Filament\Notifications\Notification;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 
 class PostResource extends Resource
 {
@@ -70,10 +68,7 @@ class PostResource extends Resource
     {
         foreach ($post->socialAccounts as $acc) {
 
-            if (
-                strtolower($acc->platform)
-                !== 'instagram'
-            ) {
+            if (strtolower($acc->platform) !== 'instagram') {
                 continue;
             }
 
@@ -81,19 +76,13 @@ class PostResource extends Resource
 
             $igId = $acc->account_id;
 
-            /*
-            |--------------------------------------------------------------------------
-            | AMBIL SEMUA MEDIA
-            |--------------------------------------------------------------------------
-            */
-
             $allMedia = $post->media;
 
             if (empty($allMedia)) {
 
                 return [
                     'success' => false,
-                    'message' => 'Media tidak ditemukan'
+                    'message' => 'Media tidak ditemukan',
                 ];
             }
 
@@ -103,7 +92,7 @@ class PostResource extends Resource
             |--------------------------------------------------------------------------
             */
 
-            $cloudinary = new \Cloudinary\Cloudinary([
+            $cloudinary = new Cloudinary([
 
                 'cloud' => [
 
@@ -173,7 +162,7 @@ class PostResource extends Resource
                         'success' => false,
 
                         'message' =>
-                        $container['error']['message']
+                        $container['error']['message'],
 
                     ];
                 }
@@ -203,13 +192,44 @@ class PostResource extends Resource
                         'success' => false,
 
                         'message' =>
-                        $publish['error']['message']
+                        $publish['error']['message'],
 
                     ];
                 }
 
+                $postId = $publish['id'] ?? null;
+
+                $postUrl = null;
+
+                if ($postId) {
+
+                    $mediaInfo = Http::get(
+                        "https://graph.facebook.com/v22.0/{$postId}",
+                        [
+                            'fields' => 'permalink',
+                            'access_token' => $token,
+                        ]
+                    )->json();
+
+                    $postUrl = $mediaInfo['permalink'] ?? null;
+                }
+
+                $post->update([
+
+                    'instagram_post_id' => $postId,
+
+                    'post_url' => $postUrl,
+
+                ]);
+
                 return [
-                    'success' => true
+
+                    'success' => true,
+
+                    'post_id' => $postId,
+
+                    'post_url' => $postUrl,
+
                 ];
             }
 
@@ -238,12 +258,6 @@ class PostResource extends Resource
                 $uploadedFileUrl =
                     $upload['secure_url'];
 
-                /*
-                |--------------------------------------------------------------------------
-                | CHILD CONTAINER
-                |--------------------------------------------------------------------------
-                */
-
                 $child = Http::post(
 
                     "https://graph.facebook.com/v22.0/$igId/media",
@@ -270,7 +284,7 @@ class PostResource extends Resource
                         'success' => false,
 
                         'message' =>
-                        $child['error']['message']
+                        $child['error']['message'],
 
                     ];
                 }
@@ -311,7 +325,7 @@ class PostResource extends Resource
                     'success' => false,
 
                     'message' =>
-                    $carousel['error']['message']
+                    $carousel['error']['message'],
 
                 ];
             }
@@ -347,13 +361,66 @@ class PostResource extends Resource
                     'success' => false,
 
                     'message' =>
-                    $publish['error']['message']
+                    $publish['error']['message'],
 
                 ];
             }
 
+            $postId = $publish['id'] ?? null;
+
+/*
+|--------------------------------------------------------------------------
+| AMBIL POST TERBARU
+|--------------------------------------------------------------------------
+*/
+
+sleep(3);
+
+$latestPostResponse = Http::get(
+
+    "https://graph.facebook.com/v22.0/{$igId}/media",
+
+    [
+
+        'fields' => 'id,permalink',
+
+        'limit' => 1,
+
+        'access_token' => $token,
+
+    ]
+
+);
+
+\Log::info('LATEST POST RESPONSE');
+
+\Log::info($latestPostResponse->body());
+
+$latestPost =
+    $latestPostResponse->json();
+
+\Log::info($latestPost);
+
+$postUrl =
+    $latestPost['data'][0]['permalink']
+    ?? null;
+
+$post->update([
+
+    'instagram_post_id' => $postId,
+
+    'post_url' => $postUrl,
+
+]);
+
             return [
-                'success' => true
+
+                'success' => true,
+
+                'post_id' => $postId,
+
+                'post_url' => $postUrl,
+
             ];
         }
 
@@ -362,7 +429,7 @@ class PostResource extends Resource
             'success' => false,
 
             'message' =>
-            'Akun instagram tidak ditemukan'
+            'Akun instagram tidak ditemukan',
 
         ];
     }
@@ -383,7 +450,10 @@ class PostResource extends Resource
                 ->options(
                     SocialAccount::all()->mapWithKeys(function ($account) {
                         return [
-                            $account->id => strtoupper($account->platform) . ' - ' . $account->username
+                            $account->id =>
+                            strtoupper($account->platform)
+                                . ' - '
+                                . $account->username,
                         ];
                     })
                 )
@@ -469,7 +539,7 @@ class PostResource extends Resource
 
                     'image/png',
 
-                    'video/mp4'
+                    'video/mp4',
 
                 ])
 
@@ -484,7 +554,6 @@ class PostResource extends Resource
                         '.'
                         .
                         $file->getClientOriginalExtension()
-
                 )
 
                 ->columnSpanFull(),
@@ -561,6 +630,12 @@ class PostResource extends Resource
                     ->dateTime('d M Y H:i')
                     ->sortable(),
 
+                TextColumn::make('post_url')
+                    ->label('URL Post')
+                    ->url(fn($record) => $record->post_url)
+                    ->openUrlInNewTab()
+                    ->limit(30),
+
                 TextColumn::make('created_at')
                     ->label('Dibuat')
                     ->dateTime('d M Y')
@@ -592,6 +667,65 @@ class PostResource extends Resource
 
                 ViewAction::make(),
 
+                Action::make('preview')
+                    ->label('Preview')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+
+                    ->modalHeading('Preview Postingan')
+
+                    ->modalWidth('4xl')
+
+                    ->modalContent(function (Post $record) {
+
+                        $media = $record->media[0] ?? null;
+
+                        $imageUrl = $media
+                            ? asset('storage/' . $media)
+                            : null;
+
+                        return new HtmlString('
+
+                        <div style="
+                            max-width:400px;
+                            margin:auto;
+                            border:1px solid #dbdbdb;
+                            border-radius:12px;
+                            overflow:hidden;
+                            background:#ffffff;
+                            font-family:Arial,sans-serif;
+                        ">
+
+                            ' .
+
+                            ($imageUrl
+                                ? '<img
+                                    src="' . $imageUrl . '"
+                                    style="
+                                        width:100%;
+                                        display:block;
+                                    "
+                                >'
+                                : ''
+                            )
+
+                            . '
+
+                            <div style="
+                                padding:12px;
+                                font-size:14px;
+                                line-height:1.5;
+                            ">
+
+                                ' . nl2br(e($record->caption)) . '
+
+                            </div>
+
+                        </div>
+
+                        ');
+                    }),
+
                 Action::make('publish')
                     ->label('Publish Sekarang')
                     ->icon('heroicon-o-paper-airplane')
@@ -599,7 +733,7 @@ class PostResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Publish Post?')
                     ->modalDescription(
-                        'Post akan dikirim ke platform melalui queue.'
+                        'Post akan dikirim ke platform.'
                     )
                     ->visible(
                         fn(Post $record) =>
@@ -656,7 +790,10 @@ class PostResource extends Resource
                     }),
 
                 EditAction::make()
-                    ->visible(fn(Post $record) => $record->status !== 'published'),
+                    ->visible(
+                        fn(Post $record) =>
+                        $record->status !== 'published'
+                    ),
 
                 DeleteAction::make(),
 
