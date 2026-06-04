@@ -218,10 +218,9 @@
                                         <div class="cal-fail-msg">⚠️ {{ $post->fail_reason }}</div>
                                     @endif
                                     <div class="cal-actions">
-                                        <a href="/admin/posts/{{ $post->id }}/edit" class="cal-btn-outline">✏️ Edit</a>
-                                        @if (in_array($post->status, ['draft','scheduled','failed']))
-                                            <a href="/admin/posts" class="cal-btn-solid">🚀 Ke Post</a>
-                                        @endif
+                                        <a href="/admin/posts" class="cal-btn-solid">
+                                            📋 Lihat Daftar Post
+                                        </a>
                                     </div>
                                 </div>
                             @endforeach
