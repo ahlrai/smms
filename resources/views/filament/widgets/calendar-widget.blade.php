@@ -29,7 +29,13 @@
             .cal-day { font-size:11px; font-weight:600; width:22px; height:22px; display:flex; align-items:center; justify-content:center; border-radius:50%; color:#374151; flex-shrink:0; }
             .dark .cal-day { color:#d1d5db; }
             .cal-day-today { background:#14c8aa; color:#fff !important; }
-            .cal-badge { font-size:10px; font-weight:500; padding:2px 5px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .cal-badge {
+            font-size:10px;
+            font-weight:500;
+            padding:4px;
+            border-radius:4px;
+            overflow:hidden;
+        }
             .cal-badge-fb { background:#dbeafe; color:#1d4ed8; }
             .dark .cal-badge-fb { background:rgba(29,78,216,.25); color:#93c5fd; }
             .cal-badge-ig { background:#fce7f3; color:#be185d; }
@@ -100,11 +106,27 @@
                                 {{ $cell['day'] }}
                             </span>
                             @foreach ($cell['posts']->take(3) as $post)
-                                <span class="cal-badge {{ $post->status === 'failed' ? 'cal-badge-fail' : ($post->platform === 'facebook' ? 'cal-badge-fb' : 'cal-badge-ig') }}">
-                                    {{ $post->platform === 'facebook' ? 'FB' : 'IG' }}
-                                    {{ \Illuminate\Support\Str::limit($post->caption, 14) }}
-                                </span>
-                            @endforeach
+
+    <div class="cal-badge {{ $post->status === 'failed'
+        ? 'cal-badge-fail'
+        : ($post->platform === 'facebook'
+            ? 'cal-badge-fb'
+            : 'cal-badge-ig') }}">
+
+        <div style="font-size:10px;font-weight:700;">
+            {{ \Carbon\Carbon::parse($post->scheduled_at)->format('H:i') }}
+        </div>
+
+        <div>
+            {{ \Illuminate\Support\Str::limit(
+            $post->title,
+            18
+        ) }}
+        </div>
+
+    </div>
+
+@endforeach
                             @if ($cell['posts']->count() > 3)
                                 <span class="cal-more">+{{ $cell['posts']->count() - 3 }} lainnya</span>
                             @endif
@@ -158,15 +180,39 @@
                                             } }}
                                         </span>
                                     </div>
-                                    <div class="cal-caption">{{ \Illuminate\Support\Str::limit($post->caption, 160) }}</div>
+                                    <div style="font-size:14px;font-weight:600;color:#111827;">
+                                        {{ $post->title }}
+                                    </div>
+
+                                    <div class="cal-caption">
+                                        {{ \Illuminate\Support\Str::limit($post->caption, 160) }}
+                                    </div>
                                     <div class="cal-meta">
-                                        <span>{{ $post->socialAccount?->username }}</span>
+
+                                        <span>
+                                            👤 {{ $post->socialAccount?->username }}
+                                        </span>
+
                                         @if ($post->scheduled_at)
-                                            <span>⏰ {{ \Carbon\Carbon::parse($post->scheduled_at)->format('H:i') }} WIB</span>
+
+                                            <span>
+                                                📅 {{ \Carbon\Carbon::parse($post->scheduled_at)->format('d M Y') }}
+                                            </span>
+
+                                            <span>
+                                                ⏰ {{ \Carbon\Carbon::parse($post->scheduled_at)->format('H:i') }} WIB
+                                            </span>
+
                                         @endif
+
                                         @if ($post->published_at)
-                                            <span>✅ {{ \Carbon\Carbon::parse($post->published_at)->format('H:i') }} WIB</span>
+
+                                            <span>
+                                                ✅ {{ \Carbon\Carbon::parse($post->published_at)->format('d M Y H:i') }} WIB
+                                            </span>
+
                                         @endif
+
                                     </div>
                                     @if ($post->fail_reason)
                                         <div class="cal-fail-msg">⚠️ {{ $post->fail_reason }}</div>
