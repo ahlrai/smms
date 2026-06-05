@@ -88,8 +88,8 @@
         {{-- ── LEFT PANEL ── --}}
         <div class="inbox-left">
             <div class="inbox-header">
-                <div class="inbox-title">💬 Unified Inbox</div>
-                <div class="inbox-subtitle">{{ $counts['unread'] }} pesan belum dibalas</div>
+                <div class="inbox-title">📩 Pusat Pesan</div>
+                <div class="inbox-subtitle">{{ $counts['unread'] }} pesan belum dibaca</div>
             </div>
 
             {{-- Filter tabs --}}
@@ -142,8 +142,8 @@
         <div class="inbox-right">
             @if (!$selected)
                 <div class="inbox-empty">
-                    <div class="inbox-empty-icon">👈</div>
-                    <span style="font-size:14px;">Pilih percakapan di sebelah kiri</span>
+                    <div class="inbox-empty-icon">📩</div>
+                    <span style="font-size:14px;">Pilih percakapan untuk melihat detail pesan</span>
                 </div>
             @else
                 {{-- Conversation header --}}
