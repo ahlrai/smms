@@ -16,4 +16,9 @@ class EditSocialAccount extends EditRecord
             DeleteAction::make(),
         ];
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return SocialAccountResource::getUrl('index');
+    }
 }
