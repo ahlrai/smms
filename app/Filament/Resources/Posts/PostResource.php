@@ -255,20 +255,31 @@ $publish = Http::post(
 
                 $postId = $publish['id'] ?? null;
 
-                $postUrl = null;
+\Log::info('POST ID');
+\Log::info([$postId]);
 
-                if ($postId) {
+$postUrl = null;
 
-                    $mediaInfo = Http::get(
-                        "https://graph.facebook.com/v22.0/{$postId}",
-                        [
-                            'fields' => 'permalink',
-                            'access_token' => $token,
-                        ]
-                    )->json();
+if ($postId) {
 
-                    $postUrl = $mediaInfo['permalink'] ?? null;
-                }
+    sleep(5);
+
+    $mediaInfo = Http::get(
+        "https://graph.facebook.com/v22.0/{$postId}",
+        [
+            'fields' => 'id,permalink',
+            'access_token' => $token,
+        ]
+    )->json();
+
+    \Log::info('MEDIA INFO');
+    \Log::info($mediaInfo);
+
+    $postUrl = $mediaInfo['permalink'] ?? null;
+}
+
+\Log::info('POST URL');
+\Log::info([$postUrl]);
 
                 $post->update([
 
@@ -440,6 +451,25 @@ $upload =
             }
 
             $postId = $publish['id'] ?? null;
+
+            $postUrl = null;
+
+if ($postId) {
+
+    sleep(3);
+
+    $mediaInfo = Http::get(
+        "https://graph.facebook.com/v22.0/{$postId}",
+        [
+            'fields' => 'permalink',
+            'access_token' => $token,
+        ]
+    )->json();
+
+    \Log::info('IG Media Info', $mediaInfo);
+
+    $postUrl = $mediaInfo['permalink'] ?? null;
+}
 
 /*
 |--------------------------------------------------------------------------
