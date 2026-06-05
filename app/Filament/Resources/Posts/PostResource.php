@@ -122,38 +122,64 @@ class PostResource extends Resource
             if (count($allMedia) === 1) {
 
                 $media =
-                    str_replace(
-                        'storage/',
-                        '',
-                        $allMedia[0]
-                    );
+    str_replace(
+        'storage/',
+        '',
+        $allMedia[0]
+    );
 
-                $upload =
-                    $cloudinary->uploadApi()->upload(
-                        public_path('storage/' . $media)
-                    );
+$filePath =
+    public_path('storage/' . $media);
+
+$mimeType =
+    mime_content_type($filePath);
+
+$isVideo =
+    str_starts_with($mimeType, 'video/');
+
+$filePath = public_path('storage/' . $media);
+
+$upload =
+    $cloudinary->uploadApi()->upload(
+        $filePath,
+        [
+            'resource_type' =>
+                $isVideo
+                    ? 'video'
+                    : 'image',
+        ]
+    );
 
                 $uploadedFileUrl =
                     $upload['secure_url'];
 
                 $container = Http::post(
+    "https://graph.facebook.com/v22.0/$igId/media",
 
-                    "https://graph.facebook.com/v22.0/$igId/media",
+    $isVideo
+        ? [
+            'media_type' => 'REELS',
 
-                    [
+            'video_url' =>
+            $uploadedFileUrl,
 
-                        'image_url' =>
-                        $uploadedFileUrl,
+            'caption' =>
+            $post->caption,
 
-                        'caption' =>
-                        $post->caption,
+            'access_token' =>
+            $token,
+        ]
+        : [
+            'image_url' =>
+            $uploadedFileUrl,
 
-                        'access_token' =>
-                        $token,
+            'caption' =>
+            $post->caption,
 
-                    ]
-
-                )->json();
+            'access_token' =>
+            $token,
+        ]
+)->json();
 
                 if (isset($container['error'])) {
 
@@ -167,23 +193,53 @@ class PostResource extends Resource
                     ];
                 }
 
-                sleep(5);
+                $containerId = $container['id'];
 
-                $publish = Http::post(
+if ($isVideo) {
 
-                    "https://graph.facebook.com/v22.0/$igId/media_publish",
+    $status = null;
 
-                    [
+    for ($i = 0; $i < 12; $i++) {
 
-                        'creation_id' =>
-                        $container['id'],
+        sleep(10);
 
-                        'access_token' =>
-                        $token,
+        $statusResponse = Http::get(
+            "https://graph.facebook.com/v22.0/{$containerId}",
+            [
+                'fields' => 'status_code',
+                'access_token' => $token,
+            ]
+        )->json();
 
-                    ]
+        $status = $statusResponse['status_code'] ?? null;
 
-                )->json();
+        if ($status === 'FINISHED') {
+            break;
+        }
+    }
+
+    if ($status !== 'FINISHED') {
+
+        return [
+            'success' => false,
+            'message' => 'Instagram masih memproses video.',
+        ];
+    }
+}
+
+$publish = Http::post(
+
+    "https://graph.facebook.com/v22.0/$igId/media_publish",
+
+    [
+
+        'creation_id' => $containerId,
+
+        'access_token' => $token,
+
+    ]
+
+)->json();
 
                 if (isset($publish['error'])) {
 
@@ -250,10 +306,27 @@ class PostResource extends Resource
                         $media
                     );
 
-                $upload =
-                    $cloudinary->uploadApi()->upload(
-                        public_path('storage/' . $media)
-                    );
+                $filePath =
+    public_path('storage/' . $media);
+
+$mimeType =
+    mime_content_type($filePath);
+
+$isVideo =
+    str_starts_with($mimeType, 'video/');
+
+$filePath = public_path('storage/' . $media);
+
+$upload =
+    $cloudinary->uploadApi()->upload(
+        $filePath,
+        [
+            'resource_type' =>
+                $isVideo
+                    ? 'video'
+                    : 'image',
+        ]
+    );
 
                 $uploadedFileUrl =
                     $upload['secure_url'];
@@ -292,7 +365,7 @@ class PostResource extends Resource
                 $children[] = $child['id'];
             }
 
-            sleep(5);
+            
 
             /*
             |--------------------------------------------------------------------------
@@ -684,6 +757,13 @@ $post->update([
                             ? asset('storage/' . $media)
                             : null;
 
+                        $isVideo =
+                        $media &&
+                        str_ends_with(
+                            strtolower($media),
+                            '.mp4'
+                        );
+
                         return new HtmlString('
 
                         <div style="
@@ -698,16 +778,29 @@ $post->update([
 
                             ' .
 
-                            ($imageUrl
-                                ? '<img
-                                    src="' . $imageUrl . '"
-                                    style="
-                                        width:100%;
-                                        display:block;
-                                    "
-                                >'
-                                : ''
-                            )
+                            (
+    $imageUrl
+        ? (
+            $isVideo
+
+                ? '<video controls
+                        style="
+                            width:100%;
+                            display:block;
+                        ">
+                        <source src="' . $imageUrl . '" type="video/mp4">
+                   </video>'
+
+                : '<img
+                        src="' . $imageUrl . '"
+                        style="
+                            width:100%;
+                            display:block;
+                        "
+                   >'
+        )
+        : ''
+)
 
                             . '
 
