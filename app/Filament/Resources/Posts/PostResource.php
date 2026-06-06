@@ -414,7 +414,7 @@ $upload =
                 ];
             }
 
-            sleep(5);
+            sleep(3);
 
             /*
             |--------------------------------------------------------------------------
@@ -778,76 +778,304 @@ $post->update([
                     ->modalHeading('Preview Postingan')
 
                     ->modalWidth('4xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup')
 
-                    ->modalContent(function (Post $record) {
+    ->modalContent(function (Post $record) {
 
-                        $media = $record->media[0] ?? null;
+        $allMedia = $record->media ?? [];
 
-                        $imageUrl = $media
-                            ? asset('storage/' . $media)
-                            : null;
+        $mediaCount = count($allMedia);
 
-                        $isVideo =
-                        $media &&
-                        str_ends_with(
-                            strtolower($media),
-                            '.mp4'
-                        );
+        $slides = '';   
 
-                        return new HtmlString('
+        foreach ($allMedia as $media) {
 
-                        <div style="
-                            max-width:400px;
-                            margin:auto;
-                            border:1px solid #dbdbdb;
-                            border-radius:12px;
-                            overflow:hidden;
-                            background:#ffffff;
-                            font-family:Arial,sans-serif;
-                        ">
+    $mediaUrl = asset('storage/' . $media);
 
-                            ' .
+    $isVideo = str_ends_with(
+        strtolower($media),
+        '.mp4'
+    );
 
-                            (
-    $imageUrl
-        ? (
-            $isVideo
+    if ($isVideo) {
 
-                ? '<video controls
-                        style="
-                            width:100%;
-                            display:block;
-                        ">
-                        <source src="' . $imageUrl . '" type="video/mp4">
-                   </video>'
+        $slides .= '
 
-                : '<img
-                        src="' . $imageUrl . '"
-                        style="
-                            width:100%;
-                            display:block;
-                        "
-                   >'
-        )
-        : ''
-)
+            <video
+                controls
+                style="
+                    width:100%;
+                    display:block;
+                    margin-bottom:10px;
+                "
+            >
+                <source
+                    src="' . $mediaUrl . '"
+                    type="video/mp4">
+            </video>
 
-                            . '
+        ';
 
-                            <div style="
-                                padding:12px;
-                                font-size:14px;
-                                line-height:1.5;
-                            ">
+    } else {
 
-                                ' . nl2br(e($record->caption)) . '
+        $slides .= '
 
-                            </div>
+            <img
+                src="' . $mediaUrl . '"
+                style="
+                    width:100%;
+                    display:block;
+                    margin-bottom:10px;
+                "
+            >
 
-                        </div>
+        ';
+    }
+}
 
-                        ');
-                    }),
+        $account =
+            $record->socialAccounts->first();
+
+        $username =
+            $account?->username
+            ?? 'instagram_user';
+
+        $platforms =
+           $record->socialAccounts
+                ->pluck('platform')
+                ->map(fn ($p) => strtolower($p))
+                ->toArray();
+
+        $instagramPreview = '
+    isi html instagram
+';
+
+$facebookPreview = '
+    <div style="
+    max-width:430px;
+    margin:auto;
+    background:#ffffff;
+    border:1px solid #ddd;
+    border-radius:10px;
+    overflow:hidden;
+    font-family:Arial,sans-serif;
+    color:#000;
+">
+
+    <div style="
+        padding:12px;
+        display:flex;
+        align-items:center;
+        gap:10px;
+    ">
+
+        <div style="
+            width:40px;
+            height:40px;
+            border-radius:50%;
+            background:#d9d9d9;
+        ">
+        </div>
+
+        <div>
+
+            <strong>'
+                . e($username) .
+            '</strong>
+
+            <br>
+
+            <span style="
+                font-size:12px;
+                color:#666;
+            ">
+                Baru saja
+            </span>
+
+        </div>
+
+    </div>
+
+    <img
+        src="' . asset('storage/' . ($record->media[0] ?? '')) . '"
+        style="
+            width:100%;
+            display:block;
+        "
+    >
+
+    <div style="
+        padding:12px;
+        font-size:14px;
+    ">
+        '
+        . nl2br(e($record->caption))
+        .
+    '
+    </div>
+
+    <div style="
+        padding:12px;
+        border-top:1px solid #eee;
+        color:#666;
+        font-size:13px;
+    ">
+        👍 120 Likes &nbsp;&nbsp; 💬 25 Komentar
+    </div>
+
+</div>
+';
+
+$html = '';
+
+if (in_array('instagram', $platforms)) {
+
+    $html .= '
+
+    <h3 style="
+        text-align:center;
+        margin-bottom:10px;
+    ">
+        Preview Instagram
+    </h3>
+
+    ';
+
+    $html .= $instagramPreview;
+}
+
+if (in_array('facebook', $platforms)) {
+
+    $html .= '
+
+    <div style="height:30px"></div>
+
+    <h3 style="
+        text-align:center;
+        margin-bottom:10px;
+    ">
+        Preview Facebook
+    </h3>
+
+    ';
+
+    $html .= $facebookPreview;
+}
+        return new HtmlString('
+
+        <div style="
+    max-width:430px;
+    margin:auto;
+    background:#ffffff;
+    border:1px solid #dbdbdb;
+    border-radius:10px;
+    overflow:hidden;
+    font-family:Arial,sans-serif;
+    color:#000;
+">
+
+            <!-- HEADER -->
+
+            <div style="
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                padding:12px;
+            ">
+
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    gap:10px;
+                ">
+
+                    <div style="
+                        width:35px;
+                        height:35px;
+                        border-radius:50%;
+                        background:#d9d9d9;
+                    ">
+                    </div>
+
+                    <strong>'
+                        . e($username) .
+                    '</strong>
+
+                </div>
+
+                <div style="
+                    font-size:20px;
+                    font-weight:bold;
+                ">
+                    •••
+                </div>
+
+            </div>
+
+            <!-- MEDIA -->
+
+<div style="
+    width:100%;
+">
+    ' . $slides . '
+</div>
+
+            <!-- ACTIONS -->
+
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                padding:12px;
+                font-size:22px;
+            ">
+
+                <div>
+
+                    ❤️
+
+                    &nbsp;&nbsp;
+
+                    💬
+
+                    &nbsp;&nbsp;
+
+                    ✈️
+
+                </div>
+
+                <div>
+
+                    🔖
+
+                </div>
+
+            </div>
+
+            <!-- CAPTION -->
+
+            <div style="
+                padding:10px 12px 16px 12px;
+                font-size:14px;
+                line-height:1.5;
+            ">
+
+                <strong>'
+                    . e($username) .
+                '</strong>
+
+                '
+
+                . nl2br(e($record->caption))
+
+                . '
+
+            </div>
+
+        </div>
+
+        ');
+    }),
 
                 Action::make('publish')
                     ->label('Publish Sekarang')
