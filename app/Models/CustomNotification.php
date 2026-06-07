@@ -15,6 +15,12 @@ class CustomNotification extends Model
         'title',
         'message',
         'type',
+
+        'platform',
+        'post_title',
+        'status',
+        'post_url',
+
         'action_url',
         'is_read',
         'read_at',
@@ -25,14 +31,10 @@ class CustomNotification extends Model
         'read_at' => 'datetime',
     ];
 
-    // ── RELATIONS ──────────────────────────────────────────────
-
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
-
-    // ── SCOPES ─────────────────────────────────────────────────
 
     public function scopeUnread($query)
     {
@@ -48,8 +50,6 @@ class CustomNotification extends Model
     {
         return $query->where('type', $type);
     }
-
-    // ── HELPERS ────────────────────────────────────────────────
 
     public function markAsRead(): void
     {
@@ -68,44 +68,70 @@ class CustomNotification extends Model
             'comment'  => '💭',
             'success'  => '✅',
             'error'    => '❌',
+            'danger'   => '❌',
             default    => 'ℹ️',
         };
     }
 
-    // Buat notifikasi untuk semua admin
     public static function notifyAdmins(
         string $title,
         string $message,
         string $type = 'info',
+        ?string $platform = null,
+        ?string $postTitle = null,
+        ?string $status = null,
+        ?string $postUrl = null,
         ?string $actionUrl = null
     ): void {
-        $admins = User::role('admin')->where('status', 'active')->get();
+
+        $admins = User::role('admin')
+            ->where('status', 'active')
+            ->get();
 
         foreach ($admins as $admin) {
+
             static::create([
-                'user_id'    => $admin->id,
-                'title'      => $title,
-                'message'    => $message,
-                'type'       => $type,
-                'action_url' => $actionUrl,
+                'user_id'     => $admin->id,
+                'title'       => $title,
+                'message'     => $message,
+                'type'        => $type,
+
+                'platform'    => $platform,
+                'post_title'  => $postTitle,
+                'status'      => $status,
+                'post_url'    => $postUrl,
+
+                'action_url'  => $actionUrl,
             ]);
         }
     }
 
-    // Buat notifikasi untuk user tertentu
     public static function notifyUser(
         int $userId,
         string $title,
         string $message,
         string $type = 'info',
+
+        ?string $platform = null,
+        ?string $postTitle = null,
+        ?string $status = null,
+        ?string $postUrl = null,
+
         ?string $actionUrl = null
     ): void {
+
         static::create([
-            'user_id'    => $userId,
-            'title'      => $title,
-            'message'    => $message,
-            'type'       => $type,
-            'action_url' => $actionUrl,
+            'user_id'     => $userId,
+            'title'       => $title,
+            'message'     => $message,
+            'type'        => $type,
+
+            'platform'    => $platform,
+            'post_title'  => $postTitle,
+            'status'      => $status,
+            'post_url'    => $postUrl,
+
+            'action_url'  => $actionUrl,
         ]);
     }
 }

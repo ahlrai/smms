@@ -165,18 +165,24 @@ class PublishPostJob implements ShouldQueue
             */
 
             CustomNotification::notifyUser(
+    userId: $post->created_by,
 
-                $post->created_by,
+    title: 'Post Berhasil Dipublish ✅',
 
-                'Post Berhasil Dipublish ✅',
+    message: 'Konten berhasil dipublikasikan sesuai jadwal.',
 
-                'Post berhasil dipublish otomatis.',
+    type: 'success',
 
-                'success',
+    platform: $post->platform,
 
-                '/admin/posts'
+    postTitle: $post->title,
 
-            );
+    status: 'published',
+
+    postUrl: $post->post_url,
+
+    actionUrl: '/admin/posts'
+);
 
             Log::info(
                 'POST BERHASIL DIPUBLISH ID: '
@@ -206,18 +212,24 @@ class PublishPostJob implements ShouldQueue
             */
 
             CustomNotification::notifyUser(
+    userId: $post->created_by,
 
-                $post->created_by,
+    title: 'Post Gagal Dipublish ❌',
 
-                'Post Gagal Dipublish ❌',
+    message: $e->getMessage(),
 
-                $e->getMessage(),
+    type: 'danger',
 
-                'danger',
+    platform: $post->platform,
 
-                '/admin/posts'
+    postTitle: $post->title,
 
-            );
+    status: 'failed',
+
+    postUrl: null,
+
+    actionUrl: '/admin/posts'
+);
 
             Log::error(
                 'PUBLISH GAGAL: '

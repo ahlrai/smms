@@ -11,8 +11,6 @@ use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Support\Assets\Css;
-use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -60,13 +58,13 @@ class AdminPanelProvider extends PanelProvider
 
             // WIDGET
             ->widgets([
-                StatsOverviewWidget::class,
-                EngagementChartWidget::class,
-            ])
+    StatsOverviewWidget::class,
+    EngagementChartWidget::class,
+])
 
-            ->assets([
-            Css::make('admin-theme', resource_path('css/filament/admin/theme.css')),
-            ])
+->viteTheme(
+    'resources/css/filament/admin/theme.css'
+)
 
             // MIDDLEWARE
             ->middleware([

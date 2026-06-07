@@ -1,3 +1,9 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source "../../../../app/Filament/**/*.php";
+@source "../../../../resources/views/**/*.blade.php";
+
+
 /* CONTENT FULL WIDTH */
 .fi-main {
     width: 100% !important;
@@ -10,12 +16,11 @@
     max-width: 100% !important;
 }
 
-/* TABLE WRAPPER */
+/* TABLE */
 .fi-ta {
     width: 100% !important;
 }
 
-/* TABLE CONTAINER */
 .fi-ta-content {
     width: 100% !important;
     overflow-x: auto;
@@ -32,10 +37,12 @@
     width: 100% !important;
 }
 
-/* RESPONSIVE SPACE */
+/* RESPONSIVE */
 @media (max-width: 1024px) {
+
     .fi-main {
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
+
 }

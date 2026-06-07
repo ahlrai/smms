@@ -70,20 +70,27 @@ Schedule::call(function () {
         ->each(function (Post $post) {
 
             CustomNotification::notifyUser(
+    userId: $post->created_by,
 
-                $post->created_by,
+    title: '⏰ Jadwal Posting Mendekat',
 
-                '⏰ Jadwal Posting Mendekat',
+    message:
+        'Konten "' .
+        $post->title .
+        '" akan dipublikasikan dalam 60 menit.',
 
-                'Posting '
-                . $post->platform .
-                ' akan dipublikasikan dalam 60 menit.',
+    type: 'warning',
 
-                'info',
+    platform: $post->platform,
 
-                '/admin/posts'
+    postTitle: $post->title,
 
-            );
+    status: 'scheduled',
+
+    postUrl: null,
+
+    actionUrl: '/admin/posts'
+);
 
         });
 
