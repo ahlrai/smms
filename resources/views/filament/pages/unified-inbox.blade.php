@@ -119,7 +119,7 @@
                         <div class="inbox-meta">
                             <div class="inbox-name">
                                 <span>{{ $msg->sender_username ?: $msg->sender_id }}</span>
-                                <span class="inbox-time">{{ $msg->sent_at?->diffForHumans(short: true) }}</span>
+                                <span class="inbox-time">{{ $msg->sent_at->format('d M Y H:i:s') }}</span>
                             </div>
                             <div class="inbox-badges">
                                 <span class="badge badge-{{ $msg->platform }}">{{ ucfirst($msg->platform) }}</span>

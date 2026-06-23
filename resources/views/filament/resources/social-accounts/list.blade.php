@@ -225,11 +225,6 @@
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                Pilih <strong>Facebook Page</strong> atau
-                <strong>Instagram Business</strong>.
-            </li>
-
-            <li style="font-size:13px;color:#64748b;line-height:1.6;">
                 Sistem akan mengarahkan pengguna ke halaman login dan otorisasi Meta.
             </li>
 

@@ -6,6 +6,7 @@ use App\Models\Message;
 use App\Models\MessageReply;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
+use App\Services\FacebookService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 
@@ -155,6 +156,7 @@ class UnifiedInboxPage extends Page
     */
 
     public function sendReply(
+<<<<<<< Updated upstream
         InstagramService $ig,
         FacebookService $fb
     ): void {
@@ -275,7 +277,149 @@ class UnifiedInboxPage extends Page
             ->title('Balasan berhasil dikirim.')
             ->success()
             ->send();
+=======
+    InstagramService $ig,
+    FacebookService $fb
+): void{
+
+    $reply = trim($this->replyText);
+
+    if (
+        empty($reply)
+        || !$this->selectedId
+    ) {
+
+        Notification::make()
+            ->title('Balasan tidak boleh kosong.')
+            ->warning()
+            ->send();
+
+        return;
     }
+
+    $message = Message::with(
+        'socialAccount'
+    )->findOrFail(
+        $this->selectedId
+    );
+
+    if (config('app.debug')) {
+    \Log::info('PLATFORM', [
+    'platform' => $message->platform,
+]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | INSTAGRAM
+    |--------------------------------------------------------------------------
+    */
+
+    $account = $message->socialAccount;
+
+/*
+|--------------------------------------------------------------------------
+| FACEBOOK
+|--------------------------------------------------------------------------
+*/
+
+if ($message->platform === 'facebook') {
+
+    $fb = app(\App\Services\FacebookService::class);
+
+    $result = $fb->sendMessage(
+        recipientId: $message->sender_id,
+        message: $reply,
+        token: $account->access_token
+    );
+
+    if (config('app.debug')) {
+    \Log::info('FB SEND RESULT', $result);
+    }
+
+    if (isset($result['error'])) {
+
+        MessageReply::create([
+            'message_id' => $message->id,
+            'reply' => $reply,
+            'replied_by' => auth()->id(),
+            'is_sent' => false,
+        ]);
+
+        Notification::make()
+            ->title(
+                $result['error']['message']
+                ?? 'Gagal mengirim pesan Facebook'
+            )
+            ->danger()
+            ->send();
+
+        return;
+>>>>>>> Stashed changes
+    }
+
+    MessageReply::create([
+        'message_id' => $message->id,
+        'reply' => $reply,
+        'replied_by' => auth()->id(),
+        'platform_reply_id' =>
+            $result['message_id']
+            ?? $result['recipient_id']
+            ?? null,
+        'is_sent' => true,
+        'sent_at' => now(),
+    ]);
+}
+
+/*
+|--------------------------------------------------------------------------
+| INSTAGRAM
+|--------------------------------------------------------------------------
+*/
+
+elseif ($message->platform === 'instagram') {
+
+    $result = $ig->sendMessage(
+        recipientId: $message->sender_id,
+        message: $reply,
+        token: $account->access_token
+    );
+    if (config('app.debug')) {
+    \Log::info('IG SEND RESULT', $result);
+    }
+
+    if (isset($result['error'])) {
+
+        MessageReply::create([
+            'message_id' => $message->id,
+            'reply' => $reply,
+            'replied_by' => auth()->id(),
+            'is_sent' => false,
+        ]);
+
+        Notification::make()
+            ->title(
+                $result['error']['message']
+                ?? 'Gagal mengirim DM Instagram'
+            )
+            ->danger()
+            ->send();
+
+        return;
+    }
+
+    MessageReply::create([
+        'message_id' => $message->id,
+        'reply' => $reply,
+        'replied_by' => auth()->id(),
+        'platform_reply_id' =>
+            $result['message_id']
+            ?? $result['recipient_id']
+            ?? null,
+        'is_sent' => true,
+        'sent_at' => now(),
+    ]);
+}
 
     /*
     |--------------------------------------------------------------------------

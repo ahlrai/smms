@@ -8,6 +8,7 @@ use App\Services\InstagramService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class SocialAuthController extends Controller
 {
@@ -213,7 +214,94 @@ class SocialAuthController extends Controller
                 $pages
             );
 
+<<<<<<< Updated upstream
             $this->saveAccountsFromPages($pages);
+=======
+            foreach ($pages as $page) {
+
+    /*
+    |--------------------------------------------------------------------------
+    | FACEBOOK PAGE
+    |--------------------------------------------------------------------------
+    */
+
+    SocialAccount::updateOrCreate(
+
+        [
+            'platform' => 'facebook',
+            'account_id' => $page['id'],
+        ],
+
+        [
+            'username' => $page['name'],
+            'access_token' => $page['access_token'],
+            'token_expired_at' => now()->addDays(60),
+            'created_by' => auth()->id(),
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | INSTAGRAM ACCOUNT
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        isset($page['instagram_business_account']['id'])
+    ) {
+
+        $igId =
+            $page['instagram_business_account']['id'];
+
+        $igInfo = Http::get(
+
+            "https://graph.facebook.com/v22.0/{$igId}",
+
+            [
+                'fields' => 'id,username,name',
+                'access_token' => $page['access_token'],
+            ]
+
+        )->json();
+
+        Log::info(
+            'INSTAGRAM INFO',
+            $igInfo
+        );
+
+        SocialAccount::updateOrCreate(
+
+            [
+                'platform' => 'instagram',
+                'account_id' => $igId,
+            ],
+
+            [
+                'username' =>
+                    $igInfo['username']
+                    ?? 'instagram',
+
+                'display_name' =>
+                    $igInfo['name']
+                    ?? null,
+
+                'access_token' =>
+                    $page['access_token'],
+
+                'token_expired_at' =>
+                    now()->addDays(60),
+
+                'created_by' =>
+                    auth()->id(),
+            ]
+        );
+    }
+}
+
+            return redirect(
+                '/admin/social-accounts'
+            )->with(
+>>>>>>> Stashed changes
 
             return redirect('/admin/social-accounts')->with(
                 'success',

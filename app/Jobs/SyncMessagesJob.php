@@ -15,6 +15,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class SyncMessagesJob implements ShouldQueue
 {
@@ -53,9 +54,11 @@ class SyncMessagesJob implements ShouldQueue
 
         foreach ($conversations as $conv) {
             // Ambil pesan dalam conversation
-            $messages = $conv['messages']['data'] ?? [];
+            $messages = collect($conv['messages']['data'] ?? [])
+    ->sortBy('created_time')
+    ->values();
 
-            foreach ($messages as $msg) {
+foreach ($messages as $msg) {
                 // Skip pesan dari halaman kita sendiri
                 if (isset($msg['from']['id']) && $msg['from']['id'] === $account->account_id) {
                     continue;
@@ -64,6 +67,11 @@ class SyncMessagesJob implements ShouldQueue
                 // De-duplikasi — skip jika sudah ada
                 $exists = Message::where('platform_message_id', $msg['id'])->exists();
                 if ($exists) continue;
+
+                Log::info('FB MESSAGE TIME', [
+    'message' => $msg['message'] ?? '',
+    'created_time_api' => $msg['created_time'] ?? null,
+]);
 
                 $message = Message::create([
                     'social_account_id'   => $account->id,
@@ -74,7 +82,13 @@ class SyncMessagesJob implements ShouldQueue
                     'message'             => $msg['message'] ?? '',
                     'status'              => 'new',
                     'is_read'             => false,
+<<<<<<< Updated upstream
                     'sent_at'             => Carbon::parse($msg['created_time'] ?? now()),
+=======
+                    'sent_at' => isset($msg['created_time'])
+    ? \Carbon\Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
+    : now(),
+>>>>>>> Stashed changes
                 ]);
 
                 $newCount++;
@@ -82,16 +96,14 @@ class SyncMessagesJob implements ShouldQueue
         }
 
         if ($newCount > 0) {
-            // Notifikasi ke semua admin & staff
-            CustomNotification::notifyAdmins(
-                $newCount . ' Pesan Facebook Baru 💬',
-                'Ada ' . $newCount . ' pesan baru masuk dari ' . $account->username,
-                'message',
-                '/admin/messages'
-            );
 
-            Log::info('SyncMessagesJob: ' . $newCount . ' pesan Facebook baru dari ' . $account->username);
-        }
+    Log::info(
+        'SyncMessagesJob: ' .
+        $newCount .
+        ' pesan Facebook baru dari ' .
+        $account->username
+    );
+}
     }
 
     private function syncInstagramMessages(SocialAccount $account, InstagramService $ig): void
@@ -100,9 +112,11 @@ class SyncMessagesJob implements ShouldQueue
         $newCount      = 0;
 
         foreach ($conversations as $conv) {
-            $messages = $conv['messages']['data'] ?? [];
+            $messages = collect($conv['messages']['data'] ?? [])
+    ->sortBy('created_time')
+    ->values();
 
-            foreach ($messages as $msg) {
+foreach ($messages as $msg) {
                 if (isset($msg['from']['id']) && $msg['from']['id'] === $account->account_id) {
                     continue;
                 }
@@ -119,22 +133,27 @@ class SyncMessagesJob implements ShouldQueue
                     'message'             => $msg['text'] ?? '',
                     'status'              => 'new',
                     'is_read'             => false,
+<<<<<<< Updated upstream
                     'sent_at'             => Carbon::parse($msg['created_time'] ?? now()),
+=======
+                    'sent_at' => isset($msg['created_time'])
+                    ? \Carbon\Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
+                    : now(),
+>>>>>>> Stashed changes
                 ]);
 
                 $newCount++;
             }
         }
 
-        if ($newCount > 0) {
-            CustomNotification::notifyAdmins(
-                $newCount . ' DM Instagram Baru 💬',
-                'Ada ' . $newCount . ' DM baru masuk dari ' . $account->username,
-                'message',
-                '/admin/messages'
-            );
+       if ($newCount > 0) {
 
-            Log::info('SyncMessagesJob: ' . $newCount . ' DM Instagram baru dari ' . $account->username);
-        }
+    Log::info(
+        'SyncMessagesJob: ' .
+        $newCount .
+        ' DM Instagram baru dari ' .
+        $account->username
+    );
+}
     }
 }

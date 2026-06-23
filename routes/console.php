@@ -107,7 +107,7 @@ Schedule::call(function () {
 
 Schedule::job(new SyncMessagesJob)
 
-    ->everyFiveMinutes()
+    ->everyMinute()
 
     ->name('sync-messages')
 

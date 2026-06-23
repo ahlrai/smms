@@ -573,16 +573,29 @@ class FacebookService
             $this->baseUrl . '/' . $account->account_id . '/conversations',
             [
                 'fields' =>
-                    'participants,messages{id,message,from,created_time}',
+'participants,messages.limit(100){id,message,from,created_time}',
                 'access_token' =>
                     $account->access_token,
             ]
         );
 
-        Log::info(
-            'FB CONVERSATIONS',
-            $response->json()
-        );
+        Log::info('FB RAW', $response->json());
+
+foreach ($response->json('data', []) as $conversation) {
+
+    foreach (($conversation['messages']['data'] ?? []) as $msg) {
+
+        Log::info('FB MESSAGE', [
+
+            'id' => $msg['id'],
+
+            'text' => $msg['message'] ?? null,
+
+            'created_time' => $msg['created_time'] ?? null,
+
+        ]);
+    }
+}
 
         return $response->json('data', []);
 
@@ -594,7 +607,77 @@ class FacebookService
         );
 
         return [];
+    } 
+}
+
+public function publishPhoto(
+    string $pageId,
+    string $pageToken,
+    string $message,
+    string $imageUrl
+): array {
+
+    $response = Http::post(
+
+        $this->baseUrl .
+        '/' .
+        $pageId .
+        '/photos',
+
+        [
+
+            'url' =>
+                $imageUrl,
+
+            'caption' =>
+                $message,
+
+            'access_token' =>
+                $pageToken,
+
+        ]
+
+    );
+
+    Log::info(
+        'FB PHOTO RESPONSE',
+        $response->json()
+    );
+
+    return $response->json();
+}
+
+public function sendMessage(
+    string $recipientId,
+    string $message,
+    string $token
+): array {
+
+    $response = Http::post(
+        $this->baseUrl . '/me/messages',
+        [
+            'recipient' => [
+                'id' => $recipientId,
+            ],
+
+            'message' => [
+                'text' => $message,
+            ],
+
+            'messaging_type' => 'RESPONSE',
+
+            'access_token' => $token,
+        ]
+    );
+
+    if (config('app.debug')) {
+    Log::info('FB SEND MESSAGE', [
+    'recipient' => $recipientId,
+    'response' => $response->json(),
+]);
     }
+
+    return $response->json();
 }
 
 }

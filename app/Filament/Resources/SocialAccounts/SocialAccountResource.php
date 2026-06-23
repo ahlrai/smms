@@ -15,16 +15,21 @@ use Filament\Tables\Table;
 
 class SocialAccountResource extends Resource
 {
-    protected static ?string $model = SocialAccount::class;
+    protected static ?string $model =
+        SocialAccount::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-share';
+    protected static string|\BackedEnum|null $navigationIcon =
+        'heroicon-o-share';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Social Media';
+    protected static string|\UnitEnum|null $navigationGroup =
+        'Social Media';
 
-    protected static ?string $navigationLabel = 'Akun Sosial';
+    protected static ?string $navigationLabel =
+        'Akun Sosial';
 
     protected static ?int $navigationSort = 1;
 
+<<<<<<< Updated upstream
     // Social accounts are visible only to users who manage them.
     public static function canViewAny(): bool
     {
@@ -45,6 +50,12 @@ class SocialAccountResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+=======
+    public static function form(
+        Schema $schema
+    ): Schema {
+
+>>>>>>> Stashed changes
         return $schema->schema([
 
             Select::make('platform')
@@ -63,25 +74,35 @@ class SocialAccountResource extends Resource
 
             TextInput::make('display_name')
                 ->label('Display Name')
-                ->placeholder('Nama yang ditampilkan')
+                ->placeholder(
+                    'Nama yang ditampilkan'
+                )
                 ->maxLength(255),
 
         ]);
     }
 
-    public static function table(Table $table): Table
-    {
+    public static function table(
+        Table $table
+    ): Table {
+
         return $table
             ->columns([
 
                 TextColumn::make('platform')
                     ->label('Platform')
                     ->badge()
-                    ->color(fn (string $state) => match ($state) {
-                        'facebook' => 'primary',
-                        'instagram' => 'pink',
-                        default => 'gray',
-                    }),
+                    ->formatStateUsing(
+                        fn (string $state) =>
+                            ucfirst($state)
+                    )
+                    ->color(
+                        fn (string $state) => match ($state) {
+                            'facebook' => 'primary',
+                            'instagram' => 'success',
+                            default => 'gray',
+                        }
+                    ),
 
                 TextColumn::make('username')
                     ->label('Username')
@@ -94,22 +115,34 @@ class SocialAccountResource extends Resource
 
                 TextColumn::make('created_at')
                     ->label('Dibuat')
-                    ->dateTime('d M Y')
+                    ->dateTime('d M Y H:i')
                     ->sortable(),
 
             ])
+
             ->actions([
+
                 EditAction::make(),
-                DeleteAction::make(),
+
+                DeleteAction::make()
+                    ->label('Hapus'),
+
             ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListSocialAccounts::route('/'),
-            'create' => Pages\CreateSocialAccount::route('/create'),
-            'edit' => Pages\EditSocialAccount::route('/{record}/edit'),
+
+            'index' =>
+                Pages\ListSocialAccounts::route('/'),
+
+            'create' =>
+                Pages\CreateSocialAccount::route('/create'),
+
+            'edit' =>
+                Pages\EditSocialAccount::route('/{record}/edit'),
+
         ];
     }
 }

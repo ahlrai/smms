@@ -129,6 +129,7 @@ class PublishPostJob implements ShouldQueue
 
                 elseif (strtolower($account->platform) === 'facebook') {
 
+<<<<<<< Updated upstream
                     $result =
                         \App\Filament\Resources\Posts\PostResource
                         ::publishFacebook($post);
@@ -137,6 +138,54 @@ class PublishPostJob implements ShouldQueue
                         throw new \Exception($result['message']);
                     }
                 }
+=======
+    $imageUrl =
+        $post->media_urls[0] ?? null;
+
+    if (!$imageUrl) {
+
+        throw new \Exception(
+            'Gambar Facebook tidak ditemukan'
+        );
+    }
+
+    $result =
+        $fb->publishPhoto(
+
+            $account->account_id,
+
+            $account->access_token,
+
+            $post->caption ?? '',
+
+            $imageUrl
+
+        );
+
+    if (!isset($result['id'])) {
+
+        throw new \Exception(
+
+            $result['error']['message']
+            ??
+
+            'Facebook publish gagal'
+
+        );
+    }
+
+    $post->update([
+
+        'platform_post_id' =>
+            $result['id'],
+
+        'post_url' =>
+            'https://facebook.com/' .
+            $result['id']
+
+    ]);
+}
+>>>>>>> Stashed changes
             }
 
             /*
