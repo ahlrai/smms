@@ -148,11 +148,8 @@ class MessageResource extends Resource
                     ->label('Balas')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('primary')
-<<<<<<< Updated upstream
                     ->visible(fn () => auth()->user()?->hasPermissionTo('message.reply') ?? false)
-=======
 
->>>>>>> Stashed changes
                     ->form([
                         Textarea::make('reply')
                             ->label('Pesan Balasan')

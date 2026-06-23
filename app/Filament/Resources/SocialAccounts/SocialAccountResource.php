@@ -29,7 +29,6 @@ class SocialAccountResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-<<<<<<< Updated upstream
     // Social accounts are visible only to users who manage them.
     public static function canViewAny(): bool
     {
@@ -48,14 +47,10 @@ class SocialAccountResource extends Resource
         return auth()->user()?->hasPermissionTo('social.manage') ?? false;
     }
 
-    public static function form(Schema $schema): Schema
-    {
-=======
     public static function form(
         Schema $schema
     ): Schema {
 
->>>>>>> Stashed changes
         return $schema->schema([
 
             Select::make('platform')

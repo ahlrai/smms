@@ -13,7 +13,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
@@ -82,13 +81,9 @@ foreach ($messages as $msg) {
                     'message'             => $msg['message'] ?? '',
                     'status'              => 'new',
                     'is_read'             => false,
-<<<<<<< Updated upstream
-                    'sent_at'             => Carbon::parse($msg['created_time'] ?? now()),
-=======
                     'sent_at' => isset($msg['created_time'])
     ? \Carbon\Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
     : now(),
->>>>>>> Stashed changes
                 ]);
 
                 $newCount++;
@@ -133,13 +128,9 @@ foreach ($messages as $msg) {
                     'message'             => $msg['text'] ?? '',
                     'status'              => 'new',
                     'is_read'             => false,
-<<<<<<< Updated upstream
-                    'sent_at'             => Carbon::parse($msg['created_time'] ?? now()),
-=======
                     'sent_at' => isset($msg['created_time'])
                     ? \Carbon\Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
                     : now(),
->>>>>>> Stashed changes
                 ]);
 
                 $newCount++;

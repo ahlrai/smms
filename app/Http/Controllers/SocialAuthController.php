@@ -33,7 +33,7 @@ class SocialAuthController extends Controller
     public function redirectToFacebook(): RedirectResponse
     {
         return redirect(
-            $this->facebookService->getLoginUrl()
+            $this->facebookService->getOAuthUrl()
         );
     }
 
@@ -106,7 +106,42 @@ class SocialAuthController extends Controller
                 $pages
             );
 
-            $this->saveAccountsFromPages($pages);
+            foreach ($pages as $page) {
+
+                SocialAccount::updateOrCreate(
+
+                    [
+
+                        'platform' =>
+                            'facebook',
+
+                        'account_id' =>
+                            $page['id']
+
+                    ],
+
+                    [
+
+                        'username' =>
+                            $page['name'],
+
+                        'access_token' =>
+                            $page['access_token'],
+
+                        'refresh_token' =>
+                            $page['instagram_business_account']['id']
+                            ?? null,
+
+                        'token_expired_at' =>
+                            now()->addDays(60),
+
+                        'created_by' =>
+                            auth()->id()
+
+                    ]
+
+                );
+            }
 
             return redirect('/admin/social-accounts')->with(
                 'success',
@@ -214,9 +249,6 @@ class SocialAuthController extends Controller
                 $pages
             );
 
-<<<<<<< Updated upstream
-            $this->saveAccountsFromPages($pages);
-=======
             foreach ($pages as $page) {
 
     /*
@@ -301,11 +333,11 @@ class SocialAuthController extends Controller
             return redirect(
                 '/admin/social-accounts'
             )->with(
->>>>>>> Stashed changes
 
-            return redirect('/admin/social-accounts')->with(
                 'success',
+
                 'Instagram berhasil terhubung'
+
             );
 
         } catch (\Exception $e) {
@@ -320,50 +352,100 @@ class SocialAuthController extends Controller
                 );
         }
     }
+/*
+|--------------------------------------------------------------------------
+| SIMPAN AKUN DARI PAGES (FB + IG)
+|--------------------------------------------------------------------------
+*/
 
-    /*
-    |--------------------------------------------------------------------------
-    | SIMPAN AKUN DARI PAGES (FB + IG)
-    |--------------------------------------------------------------------------
-    */
+private function saveAccountsFromPages(array $pages): void
+{
+    foreach ($pages as $page) {
 
-    private function saveAccountsFromPages(array $pages): void
-    {
-        foreach ($pages as $page) {
+        /*
+        |--------------------------------------------------------------------------
+        | FACEBOOK PAGE
+        |--------------------------------------------------------------------------
+        */
 
-            // Simpan Facebook Page
-            SocialAccount::updateOrCreate(
+        SocialAccount::updateOrCreate(
+
+            [
+                'platform' => 'facebook',
+                'account_id' => $page['id'],
+            ],
+
+            [
+                'username' => $page['name'],
+                'access_token' => $page['access_token'],
+                'refresh_token' =>
+                    $page['instagram_business_account']['id']
+                    ?? null,
+
+                'token_expired_at' => now()->addDays(60),
+
+                'created_by' => auth()->id(),
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | INSTAGRAM ACCOUNT
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            isset($page['instagram_business_account']['id'])
+        ) {
+
+            $igId =
+                $page['instagram_business_account']['id'];
+
+            $igInfo = Http::get(
+
+                "https://graph.facebook.com/v22.0/{$igId}",
+
                 [
-                    'platform'   => 'facebook',
-                    'account_id' => $page['id'],
-                ],
-                [
-                    'username'         => $page['name'],
-                    'access_token'     => $page['access_token'],
-                    'token_expired_at' => now()->addDays(60),
-                    'created_by'       => auth()->id(),
+                    'fields' => 'id,username,name',
+                    'access_token' => $page['access_token'],
                 ]
+
+            )->json();
+
+            Log::info(
+                'INSTAGRAM INFO',
+                $igInfo
             );
 
-            // Simpan Instagram Business Account jika terhubung
-            $ig = $page['instagram_business_account'] ?? null;
+            SocialAccount::updateOrCreate(
 
-            if ($ig && isset($ig['id'])) {
-                SocialAccount::updateOrCreate(
-                    [
-                        'platform'   => 'instagram',
-                        'account_id' => $ig['id'],
-                    ],
-                    [
-                        'username'         => $ig['username'] ?? $ig['name'] ?? $page['name'],
-                        'access_token'     => $page['access_token'],
-                        'token_expired_at' => now()->addDays(60),
-                        'created_by'       => auth()->id(),
-                    ]
-                );
-            }
+                [
+                    'platform' => 'instagram',
+                    'account_id' => $igId,
+                ],
+
+                [
+                    'username' =>
+                        $igInfo['username']
+                        ?? 'instagram',
+
+                    'display_name' =>
+                        $igInfo['name']
+                        ?? null,
+
+                    'access_token' =>
+                        $page['access_token'],
+
+                    'token_expired_at' =>
+                        now()->addDays(60),
+
+                    'created_by' =>
+                        auth()->id(),
+                ]
+            );
         }
     }
+}
 
     /*
     |--------------------------------------------------------------------------

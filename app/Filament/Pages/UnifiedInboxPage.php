@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use App\Models\Message;
 use App\Models\MessageReply;
-use App\Services\FacebookService;
 use App\Services\InstagramService;
 use App\Services\FacebookService;
 use Filament\Notifications\Notification;
@@ -21,11 +20,6 @@ class UnifiedInboxPage extends Page
     protected static ?int $navigationSort = 2;
 
     protected string $view = 'filament.pages.unified-inbox';
-
-    public static function canAccess(): bool
-    {
-        return auth()->user()?->hasPermissionTo('message.view') ?? false;
-    }
 
     /*
     |--------------------------------------------------------------------------
@@ -156,128 +150,6 @@ class UnifiedInboxPage extends Page
     */
 
     public function sendReply(
-<<<<<<< Updated upstream
-        InstagramService $ig,
-        FacebookService $fb
-    ): void {
-
-        $reply = trim($this->replyText);
-
-        if (empty($reply) || !$this->selectedId) {
-            Notification::make()
-                ->title('Balasan tidak boleh kosong.')
-                ->warning()
-                ->send();
-            return;
-        }
-
-        $message = Message::with('socialAccount')->findOrFail($this->selectedId);
-        $account = $message->socialAccount;
-
-        if (!$account) {
-            Notification::make()
-                ->title('Akun sosial tidak ditemukan.')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        /*
-        |----------------------------------------------------------------------
-        | INSTAGRAM
-        |----------------------------------------------------------------------
-        */
-
-        if ($message->platform === 'instagram') {
-
-            $result = $ig->sendMessage(
-                recipientId: $message->sender_id,
-                message: $reply,
-                token: $account->access_token
-            );
-
-            if (isset($result['error'])) {
-                MessageReply::create([
-                    'message_id' => $message->id,
-                    'reply'      => $reply,
-                    'replied_by' => auth()->id(),
-                    'is_sent'    => false,
-                ]);
-
-                Notification::make()
-                    ->title($result['error']['message'] ?? 'Gagal mengirim DM Instagram')
-                    ->danger()
-                    ->send();
-                return;
-            }
-
-            MessageReply::create([
-                'message_id'       => $message->id,
-                'reply'            => $reply,
-                'replied_by'       => auth()->id(),
-                'platform_reply_id'=> $result['message_id'] ?? null,
-                'is_sent'          => true,
-                'sent_at'          => now(),
-            ]);
-        }
-
-        /*
-        |----------------------------------------------------------------------
-        | FACEBOOK
-        |----------------------------------------------------------------------
-        */
-
-        elseif ($message->platform === 'facebook') {
-
-            $result = $fb->sendMessage(
-                recipientId: $message->sender_id,
-                text: $reply,
-                pageToken: $account->access_token
-            );
-
-            if (isset($result['error'])) {
-                MessageReply::create([
-                    'message_id' => $message->id,
-                    'reply'      => $reply,
-                    'replied_by' => auth()->id(),
-                    'is_sent'    => false,
-                ]);
-
-                Notification::make()
-                    ->title($result['error']['message'] ?? 'Gagal mengirim DM Facebook')
-                    ->danger()
-                    ->send();
-                return;
-            }
-
-            MessageReply::create([
-                'message_id'        => $message->id,
-                'reply'             => $reply,
-                'replied_by'        => auth()->id(),
-                'platform_reply_id' => $result['message_id'] ?? null,
-                'is_sent'           => true,
-                'sent_at'           => now(),
-            ]);
-        }
-
-        /*
-        |----------------------------------------------------------------------
-        | UPDATE STATUS
-        |----------------------------------------------------------------------
-        */
-
-        $message->update([
-            'status'  => 'follow-up',
-            'is_read' => true,
-        ]);
-
-        $this->replyText = '';
-
-        Notification::make()
-            ->title('Balasan berhasil dikirim.')
-            ->success()
-            ->send();
-=======
     InstagramService $ig,
     FacebookService $fb
 ): void{
@@ -355,7 +227,6 @@ if ($message->platform === 'facebook') {
             ->send();
 
         return;
->>>>>>> Stashed changes
     }
 
     MessageReply::create([
@@ -419,6 +290,25 @@ elseif ($message->platform === 'instagram') {
         'is_sent' => true,
         'sent_at' => now(),
     ]);
+}
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    $message->update([
+        'status' => 'follow-up',
+        'is_read' => true,
+    ]);
+
+    $this->replyText = '';
+
+    Notification::make()
+        ->title('Balasan berhasil dikirim.')
+        ->success()
+        ->send();
 }
 
     /*

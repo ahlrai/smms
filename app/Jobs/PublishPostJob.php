@@ -110,14 +110,21 @@ class PublishPostJob implements ShouldQueue
                 |--------------------------------------------------------------------------
                 */
 
-                if (strtolower($account->platform) === 'instagram') {
+                if (
+                    strtolower($account->platform)
+                    ===
+                    'instagram'
+                ) {
 
                     $result =
                         \App\Filament\Resources\Posts\PostResource
                         ::publishInstagram($post);
 
                     if (!$result['success']) {
-                        throw new \Exception($result['message']);
+
+                        throw new \Exception(
+                            $result['message']
+                        );
                     }
                 }
 
@@ -128,8 +135,6 @@ class PublishPostJob implements ShouldQueue
                 */
 
                 elseif (strtolower($account->platform) === 'facebook') {
-
-<<<<<<< Updated upstream
                     $result =
                         \App\Filament\Resources\Posts\PostResource
                         ::publishFacebook($post);
@@ -137,8 +142,8 @@ class PublishPostJob implements ShouldQueue
                     if (!$result['success']) {
                         throw new \Exception($result['message']);
                     }
-                }
-=======
+
+
     $imageUrl =
         $post->media_urls[0] ?? null;
 
@@ -185,7 +190,6 @@ class PublishPostJob implements ShouldQueue
 
     ]);
 }
->>>>>>> Stashed changes
             }
 
             /*
@@ -229,11 +233,11 @@ class PublishPostJob implements ShouldQueue
 
     actionUrl: '/admin/posts'
 );
-
-            // Fetch post URL in background after platform finishes processing
             FetchPostUrlJob::dispatch($post->id)->delay(now()->addSeconds(30));
-
-            Log::info('POST BERHASIL DIPUBLISH ID: ' . $post->id);
+            Log::info(
+                'POST BERHASIL DIPUBLISH ID: '
+                    . $post->id
+            );
         } catch (\Exception $e) {
 
             /*
