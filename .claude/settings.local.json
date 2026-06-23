@@ -15,7 +15,9 @@
       "Bash(php artisan about)",
       "Bash(php artisan db:seed --class=DemoDataSeeder)",
       "Bash(mysql -u root smms_db -e \"DESCRIBE post_media;\")",
-      "Bash(/dev/null:*)"
+      "Bash(/dev/null:*)",
+      "Bash(grep -v \"//\\\\|Log::\")",
+      "Bash(php -l app/Filament/Resources/UserSocialPermissions/UserSocialPermissionResource.php)"
     ]
   }
 }

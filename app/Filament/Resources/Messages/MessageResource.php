@@ -28,6 +28,11 @@ class MessageResource extends Resource
     protected static ?string $navigationLabel                = 'Pesan Masuk';
     protected static ?int    $navigationSort                 = 3;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasPermissionTo('message.view') ?? false;
+    }
+
     public static function getNavigationBadge(): ?string
     {
         return (string) Message::where('is_read', false)->count() ?: null;
@@ -117,6 +122,7 @@ class MessageResource extends Resource
                     ->label('Balas')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('primary')
+                    ->visible(fn () => auth()->user()?->hasPermissionTo('message.reply') ?? false)
                     ->form([
                         Textarea::make('reply')
                             ->label('Pesan Balasan')

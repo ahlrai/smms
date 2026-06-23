@@ -32,7 +32,7 @@ class SocialAuthController extends Controller
     public function redirectToFacebook(): RedirectResponse
     {
         return redirect(
-            $this->facebookService->getOAuthUrl()
+            $this->facebookService->getLoginUrl()
         );
     }
 
@@ -105,42 +105,7 @@ class SocialAuthController extends Controller
                 $pages
             );
 
-            foreach ($pages as $page) {
-
-                SocialAccount::updateOrCreate(
-
-                    [
-
-                        'platform' =>
-                            'facebook',
-
-                        'account_id' =>
-                            $page['id']
-
-                    ],
-
-                    [
-
-                        'username' =>
-                            $page['name'],
-
-                        'access_token' =>
-                            $page['access_token'],
-
-                        'refresh_token' =>
-                            $page['instagram_business_account']['id']
-                            ?? null,
-
-                        'token_expired_at' =>
-                            now()->addDays(60),
-
-                        'created_by' =>
-                            auth()->id()
-
-                    ]
-
-                );
-            }
+            $this->saveAccountsFromPages($pages);
 
             return redirect('/admin/social-accounts')->with(
                 'success',
@@ -248,51 +213,11 @@ class SocialAuthController extends Controller
                 $pages
             );
 
-            foreach ($pages as $page) {
+            $this->saveAccountsFromPages($pages);
 
-                SocialAccount::updateOrCreate(
-
-                    [
-
-                        'platform' =>
-                            'facebook',
-
-                        'account_id' =>
-                            $page['id']
-
-                    ],
-
-                    [
-
-                        'username' =>
-                            $page['name'],
-
-                        'access_token' =>
-                            $page['access_token'],
-
-                        'refresh_token' =>
-                            $page['instagram_business_account']['id']
-                            ?? null,
-
-                        'token_expired_at' =>
-                            now()->addDays(60),
-
-                        'created_by' =>
-                            auth()->id()
-
-                    ]
-
-                );
-            }
-
-            return redirect(
-                '/admin/social-accounts'
-            )->with(
-
+            return redirect('/admin/social-accounts')->with(
                 'success',
-
                 'Instagram berhasil terhubung'
-
             );
 
         } catch (\Exception $e) {
@@ -305,6 +230,50 @@ class SocialAuthController extends Controller
                 ->withErrors(
                     $e->getMessage()
                 );
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SIMPAN AKUN DARI PAGES (FB + IG)
+    |--------------------------------------------------------------------------
+    */
+
+    private function saveAccountsFromPages(array $pages): void
+    {
+        foreach ($pages as $page) {
+
+            // Simpan Facebook Page
+            SocialAccount::updateOrCreate(
+                [
+                    'platform'   => 'facebook',
+                    'account_id' => $page['id'],
+                ],
+                [
+                    'username'         => $page['name'],
+                    'access_token'     => $page['access_token'],
+                    'token_expired_at' => now()->addDays(60),
+                    'created_by'       => auth()->id(),
+                ]
+            );
+
+            // Simpan Instagram Business Account jika terhubung
+            $ig = $page['instagram_business_account'] ?? null;
+
+            if ($ig && isset($ig['id'])) {
+                SocialAccount::updateOrCreate(
+                    [
+                        'platform'   => 'instagram',
+                        'account_id' => $ig['id'],
+                    ],
+                    [
+                        'username'         => $ig['username'] ?? $ig['name'] ?? $page['name'],
+                        'access_token'     => $page['access_token'],
+                        'token_expired_at' => now()->addDays(60),
+                        'created_by'       => auth()->id(),
+                    ]
+                );
+            }
         }
     }
 

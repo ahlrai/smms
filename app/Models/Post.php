@@ -20,9 +20,6 @@ class Post extends Model
     'media',
     'status',
     'platform_post_id',
-    'instagram_post_id',
-    'facebook_post_id',
-    'post_url',
     'scheduled_at',
     'published_at',
     'fail_reason',
@@ -61,7 +58,6 @@ class Post extends Model
     {
         return $this->belongsTo(SocialAccount::class);
     }
-
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -92,8 +88,13 @@ class Post extends Model
     {
         return $this->belongsToMany(
             SocialAccount::class,
-            'post_social_accounts'
-        );
+            'post_social_accounts',
+            'post_id',
+            'social_account_id'
+        )->withPivot([
+            'platform_post_id',
+            'post_url',
+        ]);
     }
 
     public function postMedia()

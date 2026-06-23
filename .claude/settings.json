@@ -5,7 +5,8 @@
       "Bash(php artisan migrate)",
       "Bash(php -r \"echo file_get_contents\\(''c:/laragon/www/smms/resources/views/filament/resources/social-accounts/list.blade.php''\\);\")",
       "Bash(php -r:*)",
-      "Bash(mysql -u root smms_db -e \"SELECT id, sender_username, platform, status, is_read, LEFT\\(message,50\\) as msg FROM messages ORDER BY sent_at DESC LIMIT 6;\")"
+      "Bash(mysql -u root smms_db -e \"SELECT id, sender_username, platform, status, is_read, LEFT\\(message,50\\) as msg FROM messages ORDER BY sent_at DESC LIMIT 6;\")",
+      "Bash(php artisan tinker '--execute= *)"
     ]
   }
 }

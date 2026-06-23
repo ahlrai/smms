@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Models\Metric;
-use App\Models\Post;
 use App\Models\SocialAccount;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
@@ -26,7 +25,10 @@ class SyncMetricsJob implements ShouldQueue
         $accounts = SocialAccount::all();
 
         foreach ($accounts as $account) {
-            if ($account->isTokenExpired()) continue;
+            if ($account->isTokenExpired()) {
+                Log::warning('SyncMetricsJob: Token expired untuk ' . $account->username);
+                continue;
+            }
 
             try {
                 if ($account->platform === 'facebook') {
@@ -42,14 +44,18 @@ class SyncMetricsJob implements ShouldQueue
 
     private function syncFacebookMetrics(SocialAccount $account, FacebookService $fb): void
     {
-        // Sync metrics per post
-        $posts = Post::where('social_account_id', $account->id)
+        // ── Per-post metrics ──────────────────────────────────
+        // Ambil post via pivot post_social_accounts (sudah many-to-many)
+        $posts = $account->posts()
             ->where('status', 'published')
-            ->whereNotNull('platform_post_id')
+            ->wherePivotNotNull('platform_post_id')
             ->get();
 
         foreach ($posts as $post) {
-            $engagement = $fb->fetchPostEngagement($account, $post->platform_post_id);
+            $platformPostId = $post->pivot->platform_post_id;
+            $engagement     = $fb->fetchPostEngagement($account, $platformPostId);
+
+            if (empty($engagement)) continue;
 
             Metric::updateOrCreate(
                 [
@@ -59,21 +65,24 @@ class SyncMetricsJob implements ShouldQueue
                 ],
                 [
                     'platform'    => 'facebook',
-                    'likes'       => $engagement['likes'] ?? 0,
+                    'likes'       => $engagement['likes']    ?? 0,
                     'comments'    => $engagement['comments'] ?? 0,
-                    'shares'      => $engagement['shares'] ?? 0,
+                    'shares'      => $engagement['shares']   ?? 0,
                     'reach'       => 0,
                     'impressions' => 0,
                 ]
             );
         }
 
-        // Sync metrics level akun
-        $insights = $fb->fetchPageInsights($account);
+        // ── Account-level (page) metrics ──────────────────────
+        $pageInsights = $fb->fetchPageInsights($account);
 
-        $metricMap = [];
-        foreach ($insights as $insight) {
-            $metricMap[$insight['name']] = $insight['values'][0]['value'] ?? 0;
+        // API returns array: [{name, period, values:[{value, end_time}]}]
+        // Ambil value terbaru (index terakhir) dari setiap metrik
+        $map = [];
+        foreach ($pageInsights as $insight) {
+            $values     = $insight['values'] ?? [];
+            $map[$insight['name']] = !empty($values) ? (end($values)['value'] ?? 0) : 0;
         }
 
         Metric::updateOrCreate(
@@ -84,25 +93,33 @@ class SyncMetricsJob implements ShouldQueue
             ],
             [
                 'platform'    => 'facebook',
-                'impressions' => $metricMap['page_impressions'] ?? 0,
-                'reach'       => $metricMap['page_reach'] ?? 0,
-                'likes'       => $metricMap['page_post_engagements'] ?? 0,
+                'impressions' => $map['page_impressions']        ?? 0,
+                'reach'       => $map['page_impressions_unique'] ?? 0,
+                'likes'       => $map['page_post_engagements']   ?? 0,
+                'comments'    => 0,
+                'shares'      => 0,
             ]
         );
 
-        Log::info('SyncMetricsJob: Facebook metrics synced untuk ' . $account->username);
+        Log::info('SyncMetricsJob: Facebook metrics synced untuk ' . $account->username, [
+            'posts'      => $posts->count(),
+            'page_reach' => $map['page_impressions_unique'] ?? 0,
+        ]);
     }
 
     private function syncInstagramMetrics(SocialAccount $account, InstagramService $ig): void
     {
-        // Sync metrics per post
-        $posts = Post::where('social_account_id', $account->id)
+        // ── Per-post metrics ──────────────────────────────────
+        $posts = $account->posts()
             ->where('status', 'published')
-            ->whereNotNull('platform_post_id')
+            ->wherePivotNotNull('platform_post_id')
             ->get();
 
         foreach ($posts as $post) {
-            $insights = $ig->fetchMediaInsights($account, $post->platform_post_id);
+            $platformPostId = $post->pivot->platform_post_id;
+            $insights       = $ig->fetchMediaInsights($account, $platformPostId);
+
+            if (empty($insights)) continue;
 
             Metric::updateOrCreate(
                 [
@@ -112,22 +129,25 @@ class SyncMetricsJob implements ShouldQueue
                 ],
                 [
                     'platform'    => 'instagram',
-                    'likes'       => $insights['likes'] ?? 0,
-                    'comments'    => $insights['comments'] ?? 0,
-                    'shares'      => $insights['shares'] ?? 0,
-                    'reach'       => $insights['reach'] ?? 0,
+                    'likes'       => $insights['likes']       ?? 0,
+                    'comments'    => $insights['comments']    ?? 0,
+                    'shares'      => $insights['shares']      ?? 0,
+                    'reach'       => $insights['reach']       ?? 0,
                     'impressions' => $insights['impressions'] ?? 0,
-                    'saves'       => $insights['saved'] ?? 0,
+                    'saves'       => $insights['saved']       ?? 0,
                 ]
             );
         }
 
-        // Sync metrics level akun
+        // ── Account-level insights ────────────────────────────
         $accountInsights = $ig->fetchAccountInsights($account);
 
-        $metricMap = [];
+        // API returns [{name, period, values:[{value, end_time}]}]
+        // Ambil value terbaru (index terakhir)
+        $map = [];
         foreach ($accountInsights as $insight) {
-            $metricMap[$insight['name']] = $insight['values'][0]['value'] ?? 0;
+            $values            = $insight['values'] ?? [];
+            $map[$insight['name']] = !empty($values) ? (end($values)['value'] ?? 0) : 0;
         }
 
         Metric::updateOrCreate(
@@ -138,11 +158,18 @@ class SyncMetricsJob implements ShouldQueue
             ],
             [
                 'platform'    => 'instagram',
-                'impressions' => $metricMap['impressions'] ?? 0,
-                'reach'       => $metricMap['reach'] ?? 0,
+                'impressions' => $map['impressions']    ?? 0,
+                'reach'       => $map['reach']          ?? 0,
+                'likes'       => 0,
+                'comments'    => 0,
+                'shares'      => 0,
             ]
         );
 
-        Log::info('SyncMetricsJob: Instagram metrics synced untuk ' . $account->username);
+        Log::info('SyncMetricsJob: Instagram metrics synced untuk ' . $account->username, [
+            'posts'      => $posts->count(),
+            'reach'      => $map['reach'] ?? 0,
+            'impressions'=> $map['impressions'] ?? 0,
+        ]);
     }
 }

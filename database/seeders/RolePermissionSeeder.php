@@ -2,9 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -12,32 +13,69 @@ class RolePermissionSeeder extends Seeder
     {
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $permissions = [
-            'view_social_accounts', 'manage_social_accounts',
-            'view_posts', 'create_posts', 'edit_posts', 'delete_posts',
-            'publish_posts', 'schedule_posts',
-            'view_messages', 'reply_messages',
-            'view_comments', 'reply_comments',
-            'view_analytics', 'view_full_analytics',
-            'manage_users', 'manage_roles',
+        // ── 1. DEFINE ALL PERMISSIONS ───────────────────────────────────────
+        $allPermissions = [
+            // Posts
+            'post.create',
+            'post.edit',
+            'post.delete',
+            'post.publish',
+            'post.schedule',
+            // Comments
+            'comment.view',
+            'comment.reply',
+            // Messages
+            'message.view',
+            'message.reply',
+            // Analytics
+            'analytics.view',
+            'analytics.full',
+            // Social accounts
+            'social.manage',
+            // User management
+            'users.manage',
+            'roles.manage',
         ];
 
-        foreach ($permissions as $perm) {
-            Permission::firstOrCreate(['name' => $perm]);
+        // Remove deprecated permissions that no longer belong to the canonical set
+        Permission::whereNotIn('name', $allPermissions)->delete();
+
+        // Create new permissions idempotently
+        foreach ($allPermissions as $name) {
+            Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 
-        // Admin — semua permission
-        $admin = Role::firstOrCreate(['name' => 'admin']);
-        $admin->givePermissionTo(Permission::all());
+        // ── 2. ROLES & THEIR PERMISSIONS ────────────────────────────────────
+        $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->syncPermissions(Permission::all());
 
-        // Staff — permission terbatas
-        $staff = Role::firstOrCreate(['name' => 'staff']);
-        $staff->givePermissionTo([
-            'view_social_accounts',
-            'view_posts', 'create_posts', 'schedule_posts',
-            'view_messages', 'reply_messages',
-            'view_comments', 'reply_comments',
-            'view_analytics',
+        $staff = Role::firstOrCreate(['name' => 'staff', 'guard_name' => 'web']);
+        $staff->syncPermissions([
+            'post.create',
+            'post.schedule',
+            'comment.view',
+            'comment.reply',
+            'message.view',
+            'message.reply',
+            'analytics.view',
         ]);
+
+        // ── 3. ASSIGN ROLES TO EXISTING USERS ───────────────────────────────
+        $assignments = [
+            'admin@example.com'           => 'admin',
+            'admin@gmail.com'             => 'admin',
+            'raihanahanasahlla@gmail.com' => 'admin',
+            'staff1@example.com'          => 'staff',
+            'staff2@example.com'          => 'staff',
+        ];
+
+        $emailCol = 'email';
+        foreach ($assignments as $emailAddress => $roleName) {
+            $user = User::firstWhere($emailCol, $emailAddress);
+            $user?->syncRoles([$roleName]);
+        }
+
+        // ── 4. CLEAR CACHE ──────────────────────────────────────────────────
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }

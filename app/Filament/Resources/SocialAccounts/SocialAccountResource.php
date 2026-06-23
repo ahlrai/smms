@@ -25,6 +25,24 @@ class SocialAccountResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    // Social accounts are visible only to users who manage them.
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasPermissionTo('social.manage') ?? false;
+    }
+
+    // Accounts are connected via OAuth; the Filament create form is disabled.
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    // Only users with social.manage (admins) may delete a connected account.
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return auth()->user()?->hasPermissionTo('social.manage') ?? false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([

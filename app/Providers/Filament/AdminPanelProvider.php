@@ -2,12 +2,10 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Widgets\EngagementChartWidget;
-use App\Filament\Widgets\StatsOverviewWidget;
+use App\Filament\Pages\Dashboard;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -46,25 +44,22 @@ class AdminPanelProvider extends PanelProvider
                 for: 'App\\Filament\\Resources'
             )
 
-            // PAGE
+            // PAGE — discoverPages menemukan semua halaman di app/Filament/Pages/
             ->discoverPages(
                 in: app_path('Filament/Pages'),
                 for: 'App\\Filament\\Pages'
             )
 
             ->pages([
-                Pages\Dashboard::class,
+                Dashboard::class,
             ])
 
-            // WIDGET
-            ->widgets([
-    StatsOverviewWidget::class,
-    EngagementChartWidget::class,
-])
+            // Widget global dikosongkan — masing-masing page mengelola widgetnya sendiri:
+            // Dashboard   → App\Filament\Pages\Dashboard::getWidgets()
+            // Analytics   → App\Filament\Pages\AnalyticsPage::getHeaderWidgets()
+            ->widgets([])
 
-->viteTheme(
-    'resources/css/filament/admin/theme.css'
-)
+            ->viteTheme('resources/css/filament/admin/theme.css')
 
             // MIDDLEWARE
             ->middleware([

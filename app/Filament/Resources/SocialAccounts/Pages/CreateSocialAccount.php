@@ -8,4 +8,9 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateSocialAccount extends CreateRecord
 {
     protected static string $resource = SocialAccountResource::class;
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

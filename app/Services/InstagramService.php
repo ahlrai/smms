@@ -427,33 +427,108 @@ class InstagramService
 
     /*
     |--------------------------------------------------------------------------
+    | METRICS — PER MEDIA
+    |--------------------------------------------------------------------------
+    */
+
+    public function fetchMediaInsights(SocialAccount $account, string $mediaId): array
+    {
+        try {
+            // like_count & comments_count langsung dari media object
+            $media = Http::get($this->baseUrl . '/' . $mediaId, [
+                'fields'       => 'like_count,comments_count',
+                'access_token' => $account->access_token,
+            ])->json();
+
+            // reach, impressions, saved, shares dari /insights
+            $raw = Http::get($this->baseUrl . '/' . $mediaId . '/insights', [
+                'metric'       => 'reach,impressions,saved,shares',
+                'access_token' => $account->access_token,
+            ])->json('data', []);
+
+            $insights = collect($raw)->pluck('value', 'name')->toArray();
+
+            Log::info('IG Media Insights', ['media_id' => $mediaId, 'data' => $insights]);
+
+            return [
+                'likes'       => $media['like_count']      ?? 0,
+                'comments'    => $media['comments_count']  ?? 0,
+                'reach'       => $insights['reach']        ?? 0,
+                'impressions' => $insights['impressions']  ?? 0,
+                'saved'       => $insights['saved']        ?? 0,
+                'shares'      => $insights['shares']       ?? 0,
+            ];
+        } catch (\Exception $e) {
+            Log::error('IG fetchMediaInsights [' . $mediaId . ']: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | METRICS — LEVEL AKUN
+    |--------------------------------------------------------------------------
+    */
+
+    public function fetchAccountInsights(SocialAccount $account): array
+    {
+        try {
+            $response = Http::get($this->baseUrl . '/' . $account->account_id . '/insights', [
+                'metric'       => 'impressions,reach,profile_views',
+                'period'       => 'day',
+                'access_token' => $account->access_token,
+            ]);
+
+            Log::info('IG Account Insights', $response->json());
+
+            return $response->json('data', []);
+        } catch (\Exception $e) {
+            Log::error('IG fetchAccountInsights: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | COMMENTS
     |--------------------------------------------------------------------------
     */
 
     public function fetchComments(
-        SocialAccount $account,
-        string $mediaId
-    ): array {
+    SocialAccount $account,
+    string $postId
+    
+)
 
-        return Http::get(
+: array {
+    return Http::get(
+        $this->baseUrl . '/' . $postId . '/comments',
+        [
+            'fields' =>
+                'id,text,timestamp,username,like_count',
+            'access_token' =>
+                $account->access_token,
+        ]
+    )->json('data', []);
+    
+}
 
-            $this->baseUrl
-                . '/'
-                . $mediaId
-                . '/comments',
+public function replyComment(
+    SocialAccount $account,
+    string $commentId,
+    string $message
+): array {
 
+    return Http::asForm()
+        ->post(
+            $this->baseUrl . "/{$commentId}/replies",
             [
-
-                'fields' =>
-                    'id,text,username',
-
-                'access_token' =>
-                    $account->access_token,
+                'message'      => $message,
+                'access_token' => $account->access_token,
             ]
-
-        )->json('data', []);
-    }
+        )
+        ->json();
+}
 
     /*
     |--------------------------------------------------------------------------

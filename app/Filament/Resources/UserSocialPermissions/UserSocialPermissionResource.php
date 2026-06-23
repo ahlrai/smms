@@ -8,7 +8,7 @@ use App\Models\User;
 use App\Models\UserSocialPermission;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Section;
+use Filament\Schemas\Components\Section;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Actions\DeleteAction;
@@ -29,7 +29,7 @@ class UserSocialPermissionResource extends Resource
     // Hanya Admin yang bisa akses
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasRole('admin') ?? false;
+        return auth()->user()?->hasPermissionTo('roles.manage') ?? false;
     }
 
     public static function form(Schema $schema): Schema
@@ -53,7 +53,7 @@ class UserSocialPermissionResource extends Resource
                 ->required()
                 ->searchable(),
 
-            Section::make('Izin Akses')
+            Section::make(...['Izin Akses'])
                 ->description('Atur apa yang boleh dilakukan staff ini pada akun sosial tersebut.')
                 ->columns(2)
                 ->schema([
@@ -117,6 +117,10 @@ class UserSocialPermissionResource extends Resource
                     ->label('Akun Sosial')
                     ->searchable(),
 
+                IconColumn::make('can_view')
+                    ->label('Lihat')
+                    ->boolean(),
+
                 IconColumn::make('can_create_post')
                     ->label('Buat Post')
                     ->boolean(),
@@ -133,19 +137,23 @@ class UserSocialPermissionResource extends Resource
                     ->label('Komentar')
                     ->boolean(),
 
+                IconColumn::make('can_reply_message')
+                    ->label('Pesan')
+                    ->boolean(),
+
                 IconColumn::make('can_view_analytics')
                     ->label('Analytics')
                     ->boolean(),
             ])
             ->defaultSort('user_id')
             ->filters([
-                SelectFilter::make('social_account_id')
-                    ->label('Akun Sosial')
-                    ->relationship('socialAccount', 'username'),
-
                 SelectFilter::make('user_id')
                     ->label('Staff')
                     ->relationship('user', 'name'),
+
+                SelectFilter::make('social_account_id')
+                    ->label('Akun Sosial')
+                    ->relationship('socialAccount', 'username'),
             ])
             ->actions([
                 EditAction::make(),

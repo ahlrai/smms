@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class SocialAccount extends Model
 {
@@ -146,10 +147,17 @@ class SocialAccount extends Model
     }
 
 
-    public function posts(): HasMany
+    public function posts(): BelongsToMany
     {
-        return $this->hasMany(
-            Post::class
+        return $this->belongsToMany(
+        Post::class,
+        'post_social_accounts',
+        'social_account_id',
+        'post_id'
+    )->withPivot([
+        'platform_post_id',
+        'post_url',
+    ]
         );
     }
 

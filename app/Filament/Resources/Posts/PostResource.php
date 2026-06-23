@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Posts;
 
 use App\Filament\Resources\Posts\Pages;
+use App\Jobs\FetchPostUrlJob;
 use App\Models\Post;
 use App\Models\SocialAccount;
 
@@ -44,6 +45,26 @@ class PostResource extends Resource
     protected static ?string $navigationLabel = 'Manajemen Post';
 
     protected static ?int $navigationSort = 2;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyPermission(['post.create', 'post.edit', 'post.delete', 'post.publish', 'post.schedule']) ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->hasPermissionTo('post.create') ?? false;
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return auth()->user()?->hasPermissionTo('post.edit') ?? false;
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return auth()->user()?->hasPermissionTo('post.delete') ?? false;
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -281,22 +302,16 @@ if ($postId) {
 \Log::info('POST URL');
 \Log::info([$postUrl]);
 
-                $post->update([
-
-                    'instagram_post_id' => $postId,
-
-                    'post_url' => $postUrl,
-
+                // Simpan ke pivot post_social_accounts (untuk sync komentar)
+                $post->socialAccounts()->updateExistingPivot($acc->id, [
+                    'platform_post_id' => $postId,
+                    'post_url'         => $postUrl,
                 ]);
 
                 return [
-
-                    'success' => true,
-
-                    'post_id' => $postId,
-
+                    'success'  => true,
+                    'post_id'  => $postId,
                     'post_url' => $postUrl,
-
                 ];
             }
 
@@ -508,13 +523,14 @@ $postUrl =
     $latestPost['data'][0]['permalink']
     ?? null;
 
-$post->update([
-
-    'instagram_post_id' => $postId,
-
-    'post_url' => $postUrl,
-
-]);
+$post->socialAccounts()
+        ->updateExistingPivot(
+        $acc->id,
+        [
+            'platform_post_id' => $postId,
+            'post_url' => $postUrl,
+        ]
+    );
 
             return [
 
@@ -535,6 +551,153 @@ $post->update([
             'Akun instagram tidak ditemukan',
 
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PUBLISH FACEBOOK
+    |--------------------------------------------------------------------------
+    */
+
+    public static function publishFacebook(Post $post): array
+    {
+        foreach ($post->socialAccounts as $acc) {
+            if (strtolower($acc->platform) !== 'facebook') {
+                continue;
+            }
+
+            $token    = $acc->access_token;
+            $pageId   = $acc->account_id;
+            $allMedia = $post->media;
+
+            // Text-only post (no media)
+            if (empty($allMedia)) {
+                $res = Http::post("https://graph.facebook.com/v22.0/{$pageId}/feed", [
+                    'message'      => $post->caption,
+                    'access_token' => $token,
+                ])->json();
+
+                if (isset($res['error'])) {
+                    return ['success' => false, 'message' => $res['error']['message']];
+                }
+
+                $postId = $res['id'] ?? null;
+                $post->socialAccounts()->updateExistingPivot($acc->id, [
+                    'platform_post_id' => $postId,
+                    'post_url'         => null,
+                ]);
+
+                return ['success' => true, 'post_id' => $postId];
+            }
+
+            $cloudinary = new Cloudinary([
+                'cloud' => [
+                    'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+                    'api_key'    => env('CLOUDINARY_API_KEY'),
+                    'api_secret' => env('CLOUDINARY_API_SECRET'),
+                ],
+                'url' => ['secure' => true],
+            ]);
+
+            // Single image or video
+            if (count($allMedia) === 1) {
+                $media    = str_replace('storage/', '', $allMedia[0]);
+                $filePath = public_path('storage/' . $media);
+                $mimeType = mime_content_type($filePath);
+                $isVideo  = str_starts_with($mimeType, 'video/');
+
+                $upload = $cloudinary->uploadApi()->upload($filePath, [
+                    'resource_type' => $isVideo ? 'video' : 'image',
+                ]);
+                $url = $upload['secure_url'];
+
+                if ($isVideo) {
+                    $res = Http::post("https://graph.facebook.com/v22.0/{$pageId}/videos", [
+                        'file_url'     => $url,
+                        'description'  => $post->caption,
+                        'access_token' => $token,
+                    ])->json();
+
+                    if (isset($res['error'])) {
+                        return ['success' => false, 'message' => $res['error']['message']];
+                    }
+
+                    $mediaId = $res['id'] ?? null;
+
+                    // Poll Facebook video processing (max 2 min)
+                    if ($mediaId) {
+                        for ($i = 0; $i < 12; $i++) {
+                            sleep(10);
+                            $status = Http::get("https://graph.facebook.com/v22.0/{$mediaId}", [
+                                'fields'       => 'status',
+                                'access_token' => $token,
+                            ])->json();
+                            $videoStatus = $status['status']['video_status'] ?? null;
+                            if ($videoStatus === 'ready' || $videoStatus === 'complete') break;
+                        }
+                    }
+                } else {
+                    $res = Http::post("https://graph.facebook.com/v22.0/{$pageId}/photos", [
+                        'url'          => $url,
+                        'caption'      => $post->caption,
+                        'access_token' => $token,
+                    ])->json();
+
+                    if (isset($res['error'])) {
+                        return ['success' => false, 'message' => $res['error']['message']];
+                    }
+
+                    $mediaId = $res['id'] ?? null;
+                }
+
+                $post->socialAccounts()->updateExistingPivot($acc->id, [
+                    'platform_post_id' => $mediaId,
+                ]);
+
+                return ['success' => true, 'post_id' => $mediaId];
+            }
+
+            // Multiple images → upload each as unpublished, then create feed post
+            $photoIds = [];
+            foreach ($allMedia as $mediaItem) {
+                $media    = str_replace('storage/', '', $mediaItem);
+                $filePath = public_path('storage/' . $media);
+                $upload   = $cloudinary->uploadApi()->upload($filePath, ['resource_type' => 'image']);
+
+                $photoRes = Http::post("https://graph.facebook.com/v22.0/{$pageId}/photos", [
+                    'url'          => $upload['secure_url'],
+                    'published'    => 'false',
+                    'access_token' => $token,
+                ])->json();
+
+                if (isset($photoRes['error'])) {
+                    return ['success' => false, 'message' => $photoRes['error']['message']];
+                }
+
+                $photoIds[] = $photoRes['id'];
+            }
+
+            $params = ['message' => $post->caption, 'access_token' => $token];
+            foreach ($photoIds as $i => $pid) {
+                $params["attached_media[{$i}]"] = json_encode(['media_fbid' => $pid]);
+            }
+
+            $feedRes = Http::asForm()->post("https://graph.facebook.com/v22.0/{$pageId}/feed", $params)->json();
+
+            if (isset($feedRes['error'])) {
+                return ['success' => false, 'message' => $feedRes['error']['message']];
+            }
+
+            $postId = $feedRes['id'] ?? null;
+            $post->socialAccounts()->updateExistingPivot($acc->id, [
+                'platform_post_id' => $postId,
+                'post_url'         => null,
+            ]);
+
+            return ['success' => true, 'post_id' => $postId];
+        }
+
+        return ['success' => false, 'message' => 'Akun Facebook tidak ditemukan'];
     }
 
     /*
@@ -1088,54 +1251,48 @@ if (in_array('facebook', $platforms)) {
                     )
                     ->visible(
                         fn(Post $record) =>
-                        in_array(
-                            $record->status,
-                            ['draft', 'scheduled', 'failed']
-                        )
+                        in_array($record->status, ['draft', 'scheduled', 'failed'])
+                        && (auth()->user()?->hasPermissionTo('post.publish') ?? false)
                     )
                     ->action(function (Post $record) {
+                        $platforms = $record->socialAccounts
+                            ->pluck('platform')
+                            ->map(fn ($p) => strtolower($p))
+                            ->toArray();
 
-                        $result =
-                            self::publishInstagram($record);
+                        $errors = [];
 
-                        if ($result['success']) {
+                        if (in_array('instagram', $platforms)) {
+                            $result = self::publishInstagram($record);
+                            if (!$result['success']) {
+                                $errors[] = 'Instagram: ' . $result['message'];
+                            }
+                        }
 
+                        if (in_array('facebook', $platforms)) {
+                            $result = self::publishFacebook($record);
+                            if (!$result['success']) {
+                                $errors[] = 'Facebook: ' . $result['message'];
+                            }
+                        }
+
+                        if (empty($errors)) {
                             $record->update([
-
-                                'status' => 'published',
-
+                                'status'       => 'published',
                                 'published_at' => now(),
                             ]);
-
+                            // Fetch post URLs in background after platform processes the post
+                            FetchPostUrlJob::dispatch($record->id)->delay(now()->addSeconds(30));
                             Notification::make()
-
-                                ->title(
-                                    'Post berhasil dipublish'
-                                )
-
+                                ->title('Post berhasil dipublish')
                                 ->success()
-
                                 ->send();
-
                         } else {
-
-                            $record->update([
-
-                                'status' => 'failed',
-                            ]);
-
+                            $record->update(['status' => 'failed']);
                             Notification::make()
-
-                                ->title(
-                                    'Publish gagal'
-                                )
-
-                                ->body(
-                                    $result['message']
-                                )
-
+                                ->title('Publish gagal')
+                                ->body(implode("\n", $errors))
                                 ->danger()
-
                                 ->send();
                         }
                     }),

@@ -25,7 +25,7 @@ class UserResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasRole('admin') ?? false;
+        return auth()->user()?->hasPermissionTo('users.manage') ?? false;
     }
 
     public static function form(Schema $schema): Schema
@@ -95,11 +95,6 @@ class UserResource extends Resource
                         'inactive' => 'danger',
                         default    => 'gray',
                     }),
-
-                TextColumn::make('last_login_at')
-                    ->label('Login Terakhir')
-                    ->dateTime('d M Y H:i')
-                    ->sortable(),
 
                 TextColumn::make('created_at')
                     ->label('Dibuat')

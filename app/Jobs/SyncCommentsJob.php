@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class SyncCommentsJob implements ShouldQueue
@@ -23,32 +24,65 @@ class SyncCommentsJob implements ShouldQueue
 
     public function handle(FacebookService $fb, InstagramService $ig): void
     {
+        Log::info('SyncCommentsJob jalan');
         // Ambil semua post yang sudah dipublish
         $posts = Post::where('status', 'published')
-            ->whereNotNull('platform_post_id')
-            ->with('socialAccount')
+            ->with('socialAccounts')
             ->get();
 
         foreach ($posts as $post) {
-            $account = $post->socialAccount;
+            foreach ($post->socialAccounts as $account) {
 
-            if (!$account || $account->isTokenExpired()) continue;
+        if ($account->isTokenExpired()) {
+            continue;
+        }
 
-            try {
-                if ($post->platform === 'facebook') {
-                    $this->syncFacebookComments($post, $account, $fb);
-                } else {
-                    $this->syncInstagramComments($post, $account, $ig);
-                }
-            } catch (\Exception $e) {
-                Log::error('SyncCommentsJob error (Post ID: ' . $post->id . '): ' . $e->getMessage());
+        try {
+
+            $platformPostId =
+                $account->pivot->platform_post_id;
+
+            if (!$platformPostId) {
+                continue;
             }
+
+            if ($account->isFacebook()) {
+
+                $this->syncFacebookComments(
+                    $post,
+                    $account,
+                    $platformPostId,
+                    $fb
+                );
+            }
+
+            if ($account->isInstagram()) {
+
+                $this->syncInstagramComments(
+                    $post,
+                    $account,
+                    $platformPostId,
+                    $ig
+                );
+            }
+
+        } catch (\Exception $e) {
+
+            Log::error(
+                'SyncCommentsJob error (Post ID: '
+                . $post->id .
+                '): '
+                . $e->getMessage()
+            );
         }
     }
+}
+    }
 
-    private function syncFacebookComments($post, $account, FacebookService $fb): void
+
+    private function syncFacebookComments($post, $account, string $facebookPostID, FacebookService $fb): void
     {
-        $comments = $fb->fetchComments($account, $post->platform_post_id);
+        $comments = $fb->fetchComments($account, $facebookPostID);
         $newCount = 0;
 
         foreach ($comments as $comment) {
@@ -65,7 +99,7 @@ class SyncCommentsJob implements ShouldQueue
                 'content'             => $comment['message'] ?? '',
                 'like_count'          => $comment['like_count'] ?? 0,
                 'is_replied'          => false,
-                'commented_at'        => $comment['created_time'] ?? now(),
+                'commented_at'        => Carbon::parse($comment['created_time'] ?? now()),
             ]);
 
             $newCount++;
@@ -82,9 +116,10 @@ class SyncCommentsJob implements ShouldQueue
         }
     }
 
-    private function syncInstagramComments($post, $account, InstagramService $ig): void
+    private function syncInstagramComments($post, $account, string $instagramPostId, InstagramService $ig): void
     {
-        $comments = $ig->fetchComments($account, $post->platform_post_id);
+
+        $comments = $ig->fetchComments($account, $instagramPostId);
         $newCount = 0;
 
         foreach ($comments as $comment) {
@@ -95,13 +130,13 @@ class SyncCommentsJob implements ShouldQueue
                 'post_id'             => $post->id,
                 'social_account_id'   => $account->id,
                 'platform_comment_id' => $comment['id'],
-                'commenter_id'        => null,
-                'commenter_username'  => $comment['username'] ?? 'Unknown',
+                'commenter_id'        => $comment['from']['id'] ?? null,
+                'commenter_username'  => $comment['from']['username'] ?? $comment['username'] ?? 'Unknown',
                 'platform'            => 'instagram',
-                'content'             => $comment['text'] ?? '',
+                'content'             => $comment['text'] ?? $comment['message']?? '',
                 'like_count'          => $comment['like_count'] ?? 0,
                 'is_replied'          => false,
-                'commented_at'        => $comment['timestamp'] ?? now(),
+                'commented_at'        => Carbon::parse($comment['timestamp'] ?? $comment['created_time'] ?? now()),
             ]);
 
             $newCount++;

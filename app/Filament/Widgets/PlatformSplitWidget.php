@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Metric;
+use App\Models\Post;
 use Filament\Widgets\ChartWidget;
 
 class PlatformSplitWidget extends ChartWidget
@@ -20,6 +21,16 @@ class PlatformSplitWidget extends ChartWidget
         $ig = Metric::where('platform', 'instagram')
             ->where('recorded_date', '>=', now()->subDays(6)->toDateString())
             ->sum('reach');
+
+        // Fallback to published post counts when no metric reach data exists
+        if (($fb + $ig) == 0) {
+            $fb = Post::where('status', 'published')
+                ->whereHas('socialAccounts', fn ($q) => $q->where('platform', 'facebook'))
+                ->count();
+            $ig = Post::where('status', 'published')
+                ->whereHas('socialAccounts', fn ($q) => $q->where('platform', 'instagram'))
+                ->count();
+        }
 
         $total = $fb + $ig;
 

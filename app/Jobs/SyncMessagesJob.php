@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class SyncMessagesJob implements ShouldQueue
@@ -73,7 +74,7 @@ class SyncMessagesJob implements ShouldQueue
                     'message'             => $msg['message'] ?? '',
                     'status'              => 'new',
                     'is_read'             => false,
-                    'sent_at'             => $msg['created_time'] ?? now(),
+                    'sent_at'             => Carbon::parse($msg['created_time'] ?? now()),
                 ]);
 
                 $newCount++;
@@ -118,7 +119,7 @@ class SyncMessagesJob implements ShouldQueue
                     'message'             => $msg['text'] ?? '',
                     'status'              => 'new',
                     'is_read'             => false,
-                    'sent_at'             => $msg['created_time'] ?? now(),
+                    'sent_at'             => Carbon::parse($msg['created_time'] ?? now()),
                 ]);
 
                 $newCount++;

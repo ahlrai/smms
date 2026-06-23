@@ -33,7 +33,7 @@ class DemoDataSeeder extends Seeder
         );
         $staff2->assignRole('staff');
 
-        $admin = User::where('email', 'admin@example.com')->first();
+        $admin = User::whereEmail('admin@example.com')->first();
 
         // ── 2. SOCIAL ACCOUNTS ─────────────────────────────────────────────
         $fbAccount = SocialAccount::firstOrCreate(
