@@ -42,26 +42,36 @@ class WebhookController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | HANDLE INSTAGRAM WEBHOOK
+    | HANDLE WEBHOOK
     |--------------------------------------------------------------------------
     */
 
     public function handle(Request $request)
     {
-        Log::info(
-            'WEBHOOK IG HIT',
-            $request->all()
-        );
+        Log::info('WEBHOOK', $request->all());
 
+        if ($request->input('object') === 'instagram') {
+            return $this->handleInstagram($request);
+        }
+
+        if ($request->input('object') === 'page') {
+            return $this->handleFacebook($request);
+        }
+
+        return response('OK', 200);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HANDLE INSTAGRAM
+    |--------------------------------------------------------------------------
+    */
+
+    private function handleInstagram(Request $request)
+    {
         foreach ($request->input('entry', []) as $entry) {
 
             foreach ($entry['messaging'] ?? [] as $msg) {
-
-                /*
-                |--------------------------------------------------------------------------
-                | SKIP ECHO MESSAGE
-                |--------------------------------------------------------------------------
-                */
 
                 if (($msg['message']['is_echo'] ?? false) === true) {
 
@@ -69,12 +79,6 @@ class WebhookController extends Controller
 
                     continue;
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | AMBIL DATA PESAN
-                |--------------------------------------------------------------------------
-                */
 
                 $senderId =
                     $msg['sender']['id']
@@ -91,12 +95,6 @@ class WebhookController extends Controller
                 $platformMessageId =
                     $msg['message']['mid']
                     ?? uniqid('ig_');
-
-                /*
-                |--------------------------------------------------------------------------
-                | SKIP SELF MESSAGE
-                |--------------------------------------------------------------------------
-                */
 
                 if (
                     $senderId &&
@@ -130,14 +128,19 @@ class WebhookController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | CARI AKUN INSTAGRAM TUJUAN
+                | Cari akun Instagram tujuan
                 |--------------------------------------------------------------------------
                 */
 
                 $account = SocialAccount::where(
+                    'platform',
+                    'instagram'
+                )
+                ->where(
                     'account_id',
                     $recipientId
-                )->first();
+                )
+                ->first();
 
                 if (
                     $account &&
@@ -166,12 +169,6 @@ class WebhookController extends Controller
                     continue;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | AMBIL USERNAME INSTAGRAM
-                |--------------------------------------------------------------------------
-                */
-
                 $username =
                     $this->instagram->getUsername(
                         $senderId,
@@ -179,16 +176,8 @@ class WebhookController extends Controller
                     );
 
                 if (!$username) {
-
-                    $username =
-                        $senderId;
+                    $username = $senderId;
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | SIMPAN PESAN (ANTI DUPLIKAT)
-                |--------------------------------------------------------------------------
-                */
 
                 $message = Message::firstOrCreate(
 
@@ -198,6 +187,7 @@ class WebhookController extends Controller
                     ],
 
                     [
+
                         'social_account_id' =>
                             $account->id,
 
@@ -224,7 +214,9 @@ class WebhookController extends Controller
 
                         'sent_at' =>
                             now(),
+
                     ]
+
                 );
 
                 Log::info(
@@ -240,9 +232,118 @@ class WebhookController extends Controller
             }
         }
 
-        return response(
-            'EVENT_RECEIVED',
-            200
-        );
+        return response('OK', 200);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HANDLE FACEBOOK
+    |--------------------------------------------------------------------------
+    */
+
+    private function handleFacebook(Request $request)
+    {
+        foreach ($request->input('entry', []) as $entry) {
+
+            foreach ($entry['messaging'] ?? [] as $msg) {
+
+                if (($msg['message']['is_echo'] ?? false) === true) {
+                    continue;
+                }
+
+                $senderId =
+                    $msg['sender']['id']
+                    ?? null;
+
+                $recipientId =
+                    $msg['recipient']['id']
+                    ?? null;
+
+                $text =
+                    $msg['message']['text']
+                    ?? null;
+
+                $mid =
+                    $msg['message']['mid']
+                    ?? uniqid('fb_');
+
+                if (
+                    !$senderId ||
+                    !$recipientId ||
+                    !$text
+                ) {
+                    continue;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Cari akun Facebook Page tujuan
+                |--------------------------------------------------------------------------
+                */
+
+                $account = SocialAccount::where(
+                    'platform',
+                    'facebook'
+                )
+                ->where(
+                    'account_id',
+                    $recipientId
+                )
+                ->first();
+
+                if (!$account) {
+
+                    Log::warning(
+                        'FB Account tidak ditemukan',
+                        [
+                            'recipient' => $recipientId,
+                        ]
+                    );
+
+                    continue;
+                }
+
+                Message::firstOrCreate(
+
+                    [
+                        'platform_message_id' => $mid,
+                    ],
+
+                    [
+
+                        'social_account_id' =>
+                            $account->id,
+
+                        'sender_id' =>
+                            $senderId,
+
+                        'sender_username' =>
+                            $senderId,
+
+                        'sender_avatar' =>
+                            null,
+
+                        'platform' =>
+                            'facebook',
+
+                        'message' =>
+                            $text,
+
+                        'status' =>
+                            'new',
+
+                        'is_read' =>
+                            false,
+
+                        'sent_at' =>
+                            now(),
+
+                    ]
+
+                );
+            }
+        }
+
+        return response('OK', 200);
     }
 }

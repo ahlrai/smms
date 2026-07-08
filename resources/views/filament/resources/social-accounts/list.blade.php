@@ -221,20 +221,42 @@
             gap:6px;
         ">
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                Klik tombol <strong>"Hubungkan Akun"</strong> di bagian atas halaman.
+                Sebelum akun media sosial dapat dihubungkan ke dalam sistem, administrator harus melakukan konfigurasi aplikasi <strong>SMMS2</strong> pada <strong>Meta Developer</strong>.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                Sistem akan mengarahkan pengguna ke halaman login dan otorisasi Meta.
+                1. Administrator menambahkan akun Facebook yang akan digunakan sebagai administrator pada aplikasi SMMS2 di Meta Developer.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                Berikan izin akses yang diperlukan.
+                2. Administrator mengatur permission (izin akses) yang diperlukan pada Graph API.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                Setelah proses otorisasi berhasil, akun akan otomatis tersimpan pada sistem dan ditampilkan pada daftar akun sosial media.
+                4. Setelah konfigurasi selesai, buka menu Social Media → Akun Sosial pada sistem.
             </li>
+
+            <li style="font-size:13px;color:#64748b;line-height:1.6;">
+                5. Klik tombol Hubungkan Akun.
+            </li>
+
+            <li style="font-size:13px;color:#64748b;line-height:1.6;">
+                6. Sistem akan mengarahkan pengguna ke halaman Login dan Otorisasi Meta.
+            </li>
+
+            <li style="font-size:13px;color:#64748b;line-height:1.6;">
+                7. Login menggunakan akun Facebook yang telah didaftarkan sebagai administrator pada aplikasi SMMS2 di Meta Developer.
+            </li>
+
+            <li style="font-size:13px;color:#64748b;line-height:1.6;">
+                8. Berikan seluruh izin akses (permission) yang diminta oleh Meta.
+            </li>
+
+            <li style="font-size:13px;color:#64748b;line-height:1.6;">
+                9. Akun Facebook Page dan Instagram Business yang berhasil dihubungkan akan otomatis ditampilkan pada daftar akun sosial.
+            </li>
+
+
 
         </ol>
     </div>

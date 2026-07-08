@@ -16,10 +16,6 @@ class AnalyticsPage extends Page
     protected static ?int    $navigationSort                 = 2;
     protected string $view = 'filament.pages.analytics-page';
 
-    public static function canAccess(): bool
-    {
-        return auth()->user()?->hasPermissionTo('analytics.view') ?? false;
-    }
 
     protected function getHeaderWidgets(): array
     {

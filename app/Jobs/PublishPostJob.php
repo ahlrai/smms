@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\Post;
 use App\Models\CustomNotification;
-use App\Jobs\FetchPostUrlJob;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
 
@@ -134,61 +133,18 @@ class PublishPostJob implements ShouldQueue
                 |--------------------------------------------------------------------------
                 */
 
-                elseif (strtolower($account->platform) === 'facebook') {
-                    $result =
-                        \App\Filament\Resources\Posts\PostResource
-                        ::publishFacebook($post);
-
-                    if (!$result['success']) {
-                        throw new \Exception($result['message']);
-                    }
-
-
-    $imageUrl =
-        $post->media_urls[0] ?? null;
-
-    if (!$imageUrl) {
-
-        throw new \Exception(
-            'Gambar Facebook tidak ditemukan'
-        );
-    }
+              elseif (strtolower($account->platform) === 'facebook') {
 
     $result =
-        $fb->publishPhoto(
+        \App\Filament\Resources\Posts\PostResource
+        ::publishFacebook($post);
 
-            $account->account_id,
-
-            $account->access_token,
-
-            $post->caption ?? '',
-
-            $imageUrl
-
-        );
-
-    if (!isset($result['id'])) {
+    if (!$result['success']) {
 
         throw new \Exception(
-
-            $result['error']['message']
-            ??
-
-            'Facebook publish gagal'
-
+            $result['message']
         );
     }
-
-    $post->update([
-
-        'platform_post_id' =>
-            $result['id'],
-
-        'post_url' =>
-            'https://facebook.com/' .
-            $result['id']
-
-    ]);
 }
             }
 
@@ -233,7 +189,6 @@ class PublishPostJob implements ShouldQueue
 
     actionUrl: '/admin/posts'
 );
-            FetchPostUrlJob::dispatch($post->id)->delay(now()->addSeconds(30));
             Log::info(
                 'POST BERHASIL DIPUBLISH ID: '
                     . $post->id

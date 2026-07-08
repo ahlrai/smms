@@ -40,6 +40,7 @@ class SocialAuthController extends Controller
     public function handleFacebookCallback(
         Request $request
     ): RedirectResponse {
+        dd('MASUK HANDLE FACEBOOK CALLBACK');
 
         Log::info('=== FACEBOOK CALLBACK ===');
         Log::info($request->all());
@@ -95,16 +96,11 @@ class SocialAuthController extends Controller
                 );
             }
 
-            $pages =
-                $this->facebookService
-                ->getPages(
-                    $longToken['access_token']
-                );
+            $pages = $this->facebookService->getPages(
+    $longToken['access_token']
+);
 
-            Log::info(
-                'FB PAGES',
-                $pages
-            );
+dd($pages);
 
             foreach ($pages as $page) {
 

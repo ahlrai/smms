@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use App\Models\SocialAccount;
 
 class FacebookService
 {
@@ -50,7 +49,6 @@ class FacebookService
         'pages_read_engagement',
         'pages_manage_metadata',
         'pages_manage_posts',
-        'pages_messaging',
 
         // Instagram
         'instagram_basic',
@@ -356,7 +354,7 @@ class FacebookService
 
                         'fields' =>
 
-                            'id,name,access_token,instagram_business_account{id,username,name}',
+                            'id,name,access_token,instagram_business_account',
 
                         'access_token' =>
 
@@ -418,154 +416,7 @@ class FacebookService
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | FETCH COMMENTS ON A POST
-    |--------------------------------------------------------------------------
-    */
-
-    public function fetchComments(SocialAccount $account, string $postId): array
-    {
-        try {
-            $response = Http::get(
-                $this->baseUrl . '/' . $postId . '/comments',
-                [
-                    'fields'       => 'id,message,from,created_time,like_count',
-                    'access_token' => $account->access_token,
-                ]
-            );
-
-            Log::info('FB FETCH COMMENTS', ['post_id' => $postId, 'data' => $response->json()]);
-
-            return $response->json('data', []);
-        } catch (\Exception $e) {
-            Log::error('FB fetchComments [' . $postId . ']: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | REPLY TO COMMENT
-    |--------------------------------------------------------------------------
-    */
-
-    public function replyComment(
-        SocialAccount $account,
-        string $commentId,
-        string $message
-    ): array {
-        try {
-            $response = Http::asForm()->post(
-                $this->baseUrl . "/{$commentId}/comments",
-                [
-                    'message'      => $message,
-                    'access_token' => $account->access_token,
-                ]
-            );
-
-            Log::info('FB REPLY COMMENT', $response->json());
-
-            return $response->json();
-        } catch (\Exception $e) {
-            Log::error('FB REPLY ERROR: ' . $e->getMessage());
-            return ['error' => ['message' => $e->getMessage()]];
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | METRICS — PER POST
-    |--------------------------------------------------------------------------
-    */
-
-    public function fetchPostEngagement(SocialAccount $account, string $postId): array
-    {
-        try {
-            $response = Http::get($this->baseUrl . '/' . $postId, [
-                'fields'       => 'likes.summary(true),comments.summary(true),shares,reactions.summary(true)',
-                'access_token' => $account->access_token,
-            ]);
-
-            $data = $response->json();
-
-            Log::info('FB Post Engagement', ['post_id' => $postId, 'data' => $data]);
-
-            return [
-                'likes'    => $data['likes']['summary']['total_count']     ?? 0,
-                'comments' => $data['comments']['summary']['total_count']  ?? 0,
-                'shares'   => $data['shares']['count']                     ?? 0,
-            ];
-        } catch (\Exception $e) {
-            Log::error('FB fetchPostEngagement [' . $postId . ']: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | METRICS — LEVEL PAGE
-    |--------------------------------------------------------------------------
-    */
-
-    public function fetchPageInsights(SocialAccount $account): array
-    {
-        try {
-            $response = Http::get($this->baseUrl . '/' . $account->account_id . '/insights', [
-                'metric'       => 'page_impressions,page_impressions_unique,page_post_engagements,page_fans',
-                'period'       => 'day',
-                'access_token' => $account->access_token,
-            ]);
-
-            Log::info('FB Page Insights', $response->json());
-
-            return $response->json('data', []);
-        } catch (\Exception $e) {
-            Log::error('FB fetchPageInsights: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | REPLY TO COMMENT
-    |--------------------------------------------------------------------------
-    */
-
-    /*
-    |--------------------------------------------------------------------------
-    | SEND DM (Messenger)
-    |--------------------------------------------------------------------------
-    */
-
-    public function sendMessage(string $recipientId, string $text, string $pageToken): array
-    {
-        try {
-            $response = Http::post(
-                $this->baseUrl . '/me/messages',
-                [
-                    'recipient'    => ['id' => $recipientId],
-                    'message'      => ['text' => $text],
-                    'access_token' => $pageToken,
-                ]
-            );
-
-            Log::info('FB SEND MESSAGE', $response->json());
-
-            return $response->json();
-        } catch (\Exception $e) {
-            Log::error('FB SEND MESSAGE ERROR: ' . $e->getMessage());
-            return ['error' => ['message' => $e->getMessage()]];
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CONVERSATIONS
-    |--------------------------------------------------------------------------
-    */
-
-    public function fetchConversations($account): array
+        public function fetchConversations($account): array
 {
     try {
 
@@ -679,5 +530,4 @@ public function sendMessage(
 
     return $response->json();
 }
-
 }

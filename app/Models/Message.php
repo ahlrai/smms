@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+use App\Models\SocialAccount;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,10 +32,13 @@ class Message extends Model
 
     // ── RELATIONS ──────────────────────────────────────────────
 
-    public function socialAccount(): BelongsTo
-    {
-        return $this->belongsTo(SocialAccount::class);
-    }
+    public function socialAccount()
+{
+    return $this->belongsTo(
+        SocialAccount::class,
+        'social_account_id'
+    );
+}
 
     public function replies(): HasMany
     {

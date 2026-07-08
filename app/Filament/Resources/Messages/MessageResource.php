@@ -6,6 +6,7 @@ use App\Filament\Resources\Messages\Pages;
 use App\Models\Message;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -34,11 +35,6 @@ class MessageResource extends Resource
     protected static ?string $navigationLabel = 'Pesan Masuk';
 
     protected static ?int $navigationSort = 3;
-
-    public static function canViewAny(): bool
-    {
-        return auth()->user()?->hasPermissionTo('message.view') ?? false;
-    }
 
     public static function getNavigationBadge(): ?string
     {
@@ -78,67 +74,83 @@ class MessageResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                TextColumn::make('sender_username')
-                    ->label('Pengirim')
-                    ->searchable()
-                    ->weight('bold'),
+    return $table
+        ->columns([
 
-                TextColumn::make('platform')
-                    ->label('Platform')
-                    ->badge()
-                    ->color(fn(string $state) => match ($state) {
-                        'facebook'  => 'primary',
-                        'instagram' => 'pink',
-                        default     => 'gray',
-                    }),
+            Tables\Columns\TextColumn::make('socialAccount.username')
+                ->label('Masuk ke Akun')
+                ->badge()
+                ->sortable()
+                ->searchable(),
 
-                TextColumn::make('message')
-                    ->label('Pesan')
-                    ->limit(60)
-                    ->searchable(),
+            TextColumn::make('sender_username')
+                ->label('Pengirim')
+                ->searchable()
+                ->weight('bold'),
 
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->badge()
-                    ->color(fn(string $state) => match ($state) {
-                        'new'       => 'info',
-                        'follow-up' => 'warning',
-                        'resolved'  => 'success',
-                        default     => 'gray',
-                    }),
+            TextColumn::make('platform')
+                ->label('Sumber DM')
+                ->badge()
+                ->color(fn (string $state) => match ($state) {
+                    'facebook'  => 'primary',
+                    'instagram' => 'pink',
+                    default     => 'gray',
+                }),
 
-                IconColumn::make('is_read')
-                    ->label('Dibaca')
-                    ->boolean(),
+            TextColumn::make('message')
+                ->label('Pesan')
+                ->limit(60)
+                ->searchable(),
 
-                TextColumn::make('sent_at')
-                    ->label('Diterima')
-                    ->dateTime('d M Y H:i')
-                    ->sortable(),
+            TextColumn::make('status')
+                ->label('Status')
+                ->badge()
+                ->color(fn (string $state) => match ($state) {
+                    'new'       => 'info',
+                    'follow-up' => 'warning',
+                    'resolved'  => 'success',
+                    default     => 'gray',
+                }),
+
+            IconColumn::make('is_read')
+                ->label('Dibaca')
+                ->boolean(),
+
+            TextColumn::make('sent_at')
+                ->label('Diterima')
+                ->dateTime('d M Y H:i')
+                ->sortable(),
             ])
 
             ->defaultSort('sent_at', 'desc')
 
             ->filters([
-                SelectFilter::make('platform')
-                    ->native(false)
-                    ->options([
-                        'facebook'  => 'Facebook',
-                        'instagram' => 'Instagram',
-                    ]),
 
-                SelectFilter::make('status')
-                    ->native(false)
-                    ->options([
-                        'new'       => 'Baru',
-                        'follow-up' => 'Follow Up',
-                        'resolved'  => 'Selesai',
-                    ]),
+    SelectFilter::make('platform')
+        ->native(false)
+        ->options([
+            'facebook'  => 'Facebook',
+            'instagram' => 'Instagram',
+        ]),
 
-                TernaryFilter::make('is_read')
-                    ->label('Sudah Dibaca'),
+    SelectFilter::make('social_account_id')
+        ->relationship(
+            'socialAccount',
+            'username'
+        )
+        ->label('Akun Sosial')
+        ->native(false),
+
+    SelectFilter::make('status')
+        ->native(false)
+        ->options([
+            'new'       => 'Baru',
+            'follow-up' => 'Follow Up',
+            'resolved'  => 'Selesai',
+        ]),
+
+    TernaryFilter::make('is_read')
+        ->label('Sudah Dibaca'),
             ])
 
             ->actions([
@@ -148,7 +160,6 @@ class MessageResource extends Resource
                     ->label('Balas')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('primary')
-                    ->visible(fn () => auth()->user()?->hasPermissionTo('message.reply') ?? false)
 
                     ->form([
                         Textarea::make('reply')
@@ -190,8 +201,6 @@ class MessageResource extends Resource
     );
 
     \Log::info('FB SEND RESULT', $result);
-
-    dd($result);   // <-- tambahkan ini sementara
 
     if (isset($result['error'])) {
         throw new \Exception(
@@ -283,4 +292,10 @@ class MessageResource extends Resource
             'index' => Pages\ListMessages::route('/'),
         ];
     }
+
+    public static function getEloquentQuery(): Builder
+{
+    return parent::getEloquentQuery()
+        ->with('socialAccount');
+}
 }

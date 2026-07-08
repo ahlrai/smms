@@ -75,11 +75,28 @@ class CalendarWidget extends Widget
         return collect();
     }
 
-    return Post::whereDate('scheduled_at', $this->selectedDate)
-        ->orWhereDate('published_at', $this->selectedDate)
-        ->with('socialAccount')
-        ->orderBy('scheduled_at')
-        ->get();
+    return Post::query()
+    ->where(function ($query) {
+
+        $query->where(function ($q) {
+            $q->where('status', 'scheduled')
+              ->whereDate('scheduled_at', $this->selectedDate);
+        });
+
+        $query->orWhere(function ($q) {
+            $q->where('status', 'published')
+              ->whereDate('published_at', $this->selectedDate);
+        });
+
+        $query->orWhere(function ($q) {
+            $q->where('status', 'failed')
+              ->whereDate('scheduled_at', $this->selectedDate);
+        });
+
+    })
+    ->with('socialAccount')
+    ->orderBy('scheduled_at')
+    ->get();
 }
 
     public function getCalendarData(): array
@@ -136,11 +153,13 @@ class CalendarWidget extends Widget
         ->with('socialAccount')
         ->get()
         ->groupBy(function ($post) {
-            return Carbon::parse(
-                $post->scheduled_at
-                    ?? $post->published_at
-            )->format('Y-m-d');
-        });
+
+    $date = $post->status === 'scheduled'
+        ? $post->scheduled_at
+        : ($post->published_at ?? $post->scheduled_at);
+
+    return Carbon::parse($date)->format('Y-m-d');
+});
 
         $grid = [];
 

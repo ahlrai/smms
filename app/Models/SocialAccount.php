@@ -162,12 +162,13 @@ class SocialAccount extends Model
     }
 
 
-    public function messages(): HasMany
-    {
-        return $this->hasMany(
-            Message::class
-        );
-    }
+    public function messages()
+{
+    return $this->hasMany(
+        Message::class,
+        'social_account_id'
+    );
+}
 
 
 

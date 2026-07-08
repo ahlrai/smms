@@ -302,6 +302,10 @@ if ($postId) {
 \Log::info('POST URL');
 \Log::info([$postUrl]);
 
+$post->update([
+    'post_url' => $postUrl,
+]);
+
                 // Simpan ke pivot post_social_accounts (untuk sync komentar)
                 $post->socialAccounts()->updateExistingPivot($acc->id, [
                     'platform_post_id' => $postId,
@@ -523,6 +527,10 @@ $postUrl =
     $latestPost['data'][0]['permalink']
     ?? null;
 
+$post->update([
+    'post_url' => $postUrl,
+]);
+
 $post->socialAccounts()
         ->updateExistingPivot(
         $acc->id,
@@ -599,62 +607,140 @@ $post->socialAccounts()
                 'url' => ['secure' => true],
             ]);
 
-            // Single image or video
-            if (count($allMedia) === 1) {
-                $media    = str_replace('storage/', '', $allMedia[0]);
-                $filePath = public_path('storage/' . $media);
-                $mimeType = mime_content_type($filePath);
-                $isVideo  = str_starts_with($mimeType, 'video/');
+ // Single image or video
+if (count($allMedia) === 1) {
 
-                $upload = $cloudinary->uploadApi()->upload($filePath, [
-                    'resource_type' => $isVideo ? 'video' : 'image',
-                ]);
-                $url = $upload['secure_url'];
+    $media    = str_replace('storage/', '', $allMedia[0]);
+    $filePath = public_path('storage/' . $media);
+    $mimeType = mime_content_type($filePath);
+    $isVideo  = str_starts_with($mimeType, 'video/');
 
-                if ($isVideo) {
-                    $res = Http::post("https://graph.facebook.com/v22.0/{$pageId}/videos", [
-                        'file_url'     => $url,
-                        'description'  => $post->caption,
+    $upload = $cloudinary->uploadApi()->upload(
+        $filePath,
+        [
+            'resource_type' => $isVideo ? 'video' : 'image',
+        ]
+    );
+
+    $url = $upload['secure_url'];
+
+    if ($isVideo) {
+
+        $res = Http::post(
+            "https://graph.facebook.com/v22.0/{$pageId}/videos",
+            [
+                'file_url'     => $url,
+                'description'  => $post->caption,
+                'access_token' => $token,
+            ]
+        )->json();
+
+        if (isset($res['error'])) {
+            return [
+                'success' => false,
+                'message' => $res['error']['message'],
+            ];
+        }
+
+        $mediaId = $res['id'] ?? null;
+
+        // Poll Facebook video processing (max 2 min)
+        if ($mediaId) {
+
+            for ($i = 0; $i < 12; $i++) {
+
+                sleep(10);
+
+                $status = Http::get(
+                    "https://graph.facebook.com/v22.0/{$mediaId}",
+                    [
+                        'fields'       => 'status',
                         'access_token' => $token,
-                    ])->json();
+                    ]
+                )->json();
 
-                    if (isset($res['error'])) {
-                        return ['success' => false, 'message' => $res['error']['message']];
-                    }
+                $videoStatus = $status['status']['video_status'] ?? null;
 
-                    $mediaId = $res['id'] ?? null;
-
-                    // Poll Facebook video processing (max 2 min)
-                    if ($mediaId) {
-                        for ($i = 0; $i < 12; $i++) {
-                            sleep(10);
-                            $status = Http::get("https://graph.facebook.com/v22.0/{$mediaId}", [
-                                'fields'       => 'status',
-                                'access_token' => $token,
-                            ])->json();
-                            $videoStatus = $status['status']['video_status'] ?? null;
-                            if ($videoStatus === 'ready' || $videoStatus === 'complete') break;
-                        }
-                    }
-                } else {
-                    $res = Http::post("https://graph.facebook.com/v22.0/{$pageId}/photos", [
-                        'url'          => $url,
-                        'caption'      => $post->caption,
-                        'access_token' => $token,
-                    ])->json();
-
-                    if (isset($res['error'])) {
-                        return ['success' => false, 'message' => $res['error']['message']];
-                    }
-
-                    $mediaId = $res['id'] ?? null;
+                if (
+                    $videoStatus === 'ready' ||
+                    $videoStatus === 'complete'
+                ) {
+                    break;
                 }
+            }
+        }
 
-                $post->socialAccounts()->updateExistingPivot($acc->id, [
-                    'platform_post_id' => $mediaId,
-                ]);
+    } else {
 
-                return ['success' => true, 'post_id' => $mediaId];
+        $res = Http::post(
+            "https://graph.facebook.com/v22.0/{$pageId}/photos",
+            [
+                'url'          => $url,
+                'caption'      => $post->caption,
+                'access_token' => $token,
+            ]
+        )->json();
+
+        if (isset($res['error'])) {
+            return [
+                'success' => false,
+                'message' => $res['error']['message'],
+            ];
+        }
+
+        // Simpan post_id yang nanti dipakai mengambil permalink
+        $mediaId = $res['post_id'] ?? null;
+    }
+    \Log::info($res);
+
+    $postUrl = null;
+
+/*
+|--------------------------------------------------------------------------
+| Ambil permalink Facebook
+|--------------------------------------------------------------------------
+*/
+
+for ($i = 0; $i < 5; $i++) {
+
+    sleep(3);
+
+    $info = Http::get(
+        "https://graph.facebook.com/v22.0/{$mediaId}",
+        [
+            'fields' => 'permalink_url',
+            'access_token' => $token,
+        ]
+    )->json();
+
+    $postUrl = $info['permalink_url'] ?? null;
+
+    if ($postUrl && str_starts_with($postUrl, '/')) {
+        $postUrl = 'https://www.facebook.com' . $postUrl;
+    }
+
+    if ($postUrl) {
+        break;
+    }
+}
+
+$post->update([
+    'post_url' => $postUrl,
+]);
+
+$post->socialAccounts()->updateExistingPivot(
+    $acc->id,
+    [
+        'platform_post_id' => $mediaId,
+        'post_url'         => $postUrl,
+    ]
+);
+
+return [
+    'success'  => true,
+    'post_id'  => $mediaId,
+    'post_url' => $postUrl,
+];
             }
 
             // Multiple images → upload each as unpublished, then create feed post
@@ -689,12 +775,52 @@ $post->socialAccounts()
             }
 
             $postId = $feedRes['id'] ?? null;
-            $post->socialAccounts()->updateExistingPivot($acc->id, [
-                'platform_post_id' => $postId,
-                'post_url'         => null,
-            ]);
 
-            return ['success' => true, 'post_id' => $postId];
+$postUrl = null;
+
+/*
+|--------------------------------------------------------------------------
+| Ambil permalink Facebook
+|--------------------------------------------------------------------------
+*/
+
+for ($i = 0; $i < 5; $i++) {
+
+    sleep(3);
+
+    $info = Http::get(
+        "https://graph.facebook.com/v22.0/{$postId}",
+        [
+            'fields' => 'permalink_url',
+            'access_token' => $token,
+        ]
+    )->json();
+
+    if (!empty($info['permalink_url'])) {
+
+        $postUrl = $info['permalink_url'];
+
+        break;
+    }
+}
+
+$post->update([
+    'post_url' => $postUrl,
+]);
+
+$post->socialAccounts()->updateExistingPivot(
+    $acc->id,
+    [
+        'platform_post_id' => $postId,
+        'post_url'         => $postUrl,
+    ]
+);
+
+return [
+    'success'  => true,
+    'post_id'  => $postId,
+    'post_url' => $postUrl,
+];
         }
 
         return ['success' => false, 'message' => 'Akun Facebook tidak ditemukan'];
@@ -897,10 +1023,30 @@ $post->socialAccounts()
                     ->sortable(),
 
                 TextColumn::make('post_url')
-                    ->label('URL Post')
-                    ->url(fn($record) => $record->post_url)
-                    ->openUrlInNewTab()
-                    ->limit(30),
+    ->label('URL Post')
+    ->html()
+    ->formatStateUsing(function ($state, $record) {
+
+        $html = '';
+
+        foreach ($record->socialAccounts as $account) {
+
+            if (!$account->pivot->post_url) {
+                continue;
+            }
+
+            $platform = ucfirst($account->platform);
+
+            $html .= "<div style='margin-bottom:8px'>
+                        <strong>{$platform}</strong><br>
+                        <a href='{$account->pivot->post_url}' target='_blank'>
+                            {$account->pivot->post_url}
+                        </a>
+                      </div>";
+        }
+
+        return new HtmlString($html);
+    }),
 
                 TextColumn::make('created_at')
                     ->label('Dibuat')
@@ -1282,7 +1428,6 @@ if (in_array('facebook', $platforms)) {
                                 'published_at' => now(),
                             ]);
                             // Fetch post URLs in background after platform processes the post
-                            FetchPostUrlJob::dispatch($record->id)->delay(now()->addSeconds(30));
                             Notification::make()
                                 ->title('Post berhasil dipublish')
                                 ->success()

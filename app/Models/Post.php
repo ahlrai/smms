@@ -24,6 +24,7 @@ class Post extends Model
     'published_at',
     'fail_reason',
     'created_by',
+    'post_url',
     ];
 
     protected $casts = [

@@ -113,9 +113,15 @@
             ? 'cal-badge-fb'
             : 'cal-badge-ig') }}">
 
-        <div style="font-size:10px;font-weight:700;">
-            {{ \Carbon\Carbon::parse($post->scheduled_at)->format('H:i') }}
-        </div>
+        @php
+    $displayTime = $post->status === 'scheduled'
+        ? $post->scheduled_at
+        : ($post->published_at ?? $post->scheduled_at);
+@endphp
+
+<div style="font-size:10px;font-weight:700;">
+    {{ \Carbon\Carbon::parse($displayTime)->format('H:i') }}
+</div>
 
         <div>
             {{ \Illuminate\Support\Str::limit(
