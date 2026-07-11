@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Posts;
 use App\Filament\Resources\Posts\Pages;
 use App\Jobs\FetchPostUrlJob;
 use App\Models\Post;
+use App\Models\CustomNotification;
 use App\Models\SocialAccount;
 
 use Cloudinary\Cloudinary;
@@ -83,16 +84,18 @@ class PostResource extends Resource
     |--------------------------------------------------------------------------
     | PUBLISH INSTAGRAM
     |--------------------------------------------------------------------------
-    */
+    */ // Fungsi utama untuk mempublikasikan post ke Instagram. upload media, membuat media container, mem-publish ke Instagram, lalu menyimpan ID post dan URL post.
 
     public static function publishInstagram(Post $post)
     {
+        // Melakukan publish ke setiap akun Instagram yang dipilih pada post (Perulangan Multi Akun)
         foreach ($post->socialAccounts as $acc) {
 
             if (strtolower($acc->platform) !== 'instagram') {
                 continue;
             }
 
+            // Mengambil Page Access Token dan Instagram Business Account ID
             $token = $acc->access_token;
 
             $igId = $acc->account_id;
@@ -109,7 +112,7 @@ class PostResource extends Resource
 
             /*
             |--------------------------------------------------------------------------
-            | CLOUDINARY
+            | CLOUDINARY agar menghasilkan URL publik. URL tersebut menjadi syarat Graph API untuk publish ke Instagram.
             |--------------------------------------------------------------------------
             */
 
@@ -160,6 +163,7 @@ $isVideo =
 
 $filePath = public_path('storage/' . $media);
 
+// Upload file ke Cloudinary dan menghasilkan URL publik
 $upload =
     $cloudinary->uploadApi()->upload(
         $filePath,
@@ -220,6 +224,7 @@ if ($isVideo) {
 
     $status = null;
 
+    // Menunggu proses encoding video selesai di server Meta
     for ($i = 0; $i < 12; $i++) {
 
         sleep(10);
@@ -302,6 +307,7 @@ if ($postId) {
 \Log::info('POST URL');
 \Log::info([$postUrl]);
 
+// Menyimpan URL postingan ke tabel posts
 $post->update([
     'post_url' => $postUrl,
 ]);
@@ -569,6 +575,7 @@ $post->socialAccounts()
 
     public static function publishFacebook(Post $post): array
     {
+        // Publish ke setiap akun Facebook yang dipilih
         foreach ($post->socialAccounts as $acc) {
             if (strtolower($acc->platform) !== 'facebook') {
                 continue;
@@ -701,6 +708,8 @@ if (count($allMedia) === 1) {
 |--------------------------------------------------------------------------
 */
 
+// Setelah post berhasil dipublish, sistem mengambil permalink menggunakan Graph API agar URL postingan dapat disimpan ke database.
+// Mengulang request maksimal 5 kali karena permalink terkadang tidak langsung tersedia setelah publish.
 for ($i = 0; $i < 5; $i++) {
 
     sleep(3);
@@ -724,10 +733,12 @@ for ($i = 0; $i < 5; $i++) {
     }
 }
 
+// Menyimpan URL postingan Facebook ke tabel posts
 $post->update([
     'post_url' => $postUrl,
 ]);
 
+//  Menyimpan Platform Post ID dan URL Post ke pivot table post_social_accounts agar dapat digunakan untuk sinkronisasi komentar
 $post->socialAccounts()->updateExistingPivot(
     $acc->id,
     [
@@ -836,8 +847,10 @@ return [
     {
         return $schema->schema([
 
+            // Memilih satu atau lebih akun sosial tujuan posting
             Select::make('social_account_ids')
                 ->label('Akun Sosial')
+                // Mengizinkan memilih lebih dari satu akun sosial
                 ->multiple()
                 ->options(
                     SocialAccount::all()->mapWithKeys(function ($account) {
@@ -921,6 +934,7 @@ return [
 
                 ->downloadable()
 
+                // Mengatur urutan media untuk carousel
                 ->reorderable()
 
                 ->appendFiles()
@@ -1150,6 +1164,7 @@ return [
             $account?->username
             ?? 'instagram_user';
 
+        // Mengambil seluruh platform tujuan, inti bisa multi platform
         $platforms =
            $record->socialAccounts
                 ->pluck('platform')
@@ -1427,6 +1442,26 @@ if (in_array('facebook', $platforms)) {
                                 'status'       => 'published',
                                 'published_at' => now(),
                             ]);
+
+                            CustomNotification::notifyUser(
+    userId: $record->created_by,
+
+    title: 'Post Berhasil Dipublish ✅',
+
+    message: 'Konten berhasil dipublikasikan.',
+
+    type: 'success',
+
+    platform: $record->platform,
+
+    postTitle: $record->title,
+
+    status: 'published',
+
+    postUrl: $record->post_url,
+
+    actionUrl: '/admin/posts'
+);
                             // Fetch post URLs in background after platform processes the post
                             Notification::make()
                                 ->title('Post berhasil dipublish')

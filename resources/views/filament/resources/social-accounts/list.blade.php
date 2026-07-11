@@ -233,27 +233,27 @@
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                4. Setelah konfigurasi selesai, buka menu Social Media → Akun Sosial pada sistem.
+                3. Setelah konfigurasi selesai, buka menu Social Media → Akun Sosial pada sistem.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                5. Klik tombol Hubungkan Akun.
+                4. Klik tombol Hubungkan Akun.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                6. Sistem akan mengarahkan pengguna ke halaman Login dan Otorisasi Meta.
+                5. Sistem akan mengarahkan pengguna ke halaman Login dan Otorisasi Meta.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                7. Login menggunakan akun Facebook yang telah didaftarkan sebagai administrator pada aplikasi SMMS2 di Meta Developer.
+                6. Login menggunakan akun Facebook yang telah didaftarkan sebagai administrator pada aplikasi SMMS2 di Meta Developer.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                8. Berikan seluruh izin akses (permission) yang diminta oleh Meta.
+                7. Berikan seluruh izin akses (permission) yang diminta oleh Meta.
             </li>
 
             <li style="font-size:13px;color:#64748b;line-height:1.6;">
-                9. Akun Facebook Page dan Instagram Business yang berhasil dihubungkan akan otomatis ditampilkan pada daftar akun sosial.
+                8. Akun Facebook Page dan Instagram Business yang berhasil dihubungkan akan otomatis ditampilkan pada daftar akun sosial.
             </li>
 
 

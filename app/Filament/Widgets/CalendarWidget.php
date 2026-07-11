@@ -94,7 +94,7 @@ class CalendarWidget extends Widget
         });
 
     })
-    ->with('socialAccount')
+    ->with('socialAccounts')
     ->orderBy('scheduled_at')
     ->get();
 }
@@ -150,7 +150,7 @@ class CalendarWidget extends Widget
             'published',
             'failed',
         ])
-        ->with('socialAccount')
+        ->with('socialAccounts')
         ->get()
         ->groupBy(function ($post) {
 

@@ -174,9 +174,17 @@
                             @foreach ($selPosts as $post)
                                 <div class="cal-card">
                                     <div class="cal-card-top">
-                                        <span class="cal-plat {{ $post->platform === 'facebook' ? 'cal-plat-fb' : 'cal-plat-ig' }}">
-                                            {{ $post->platform === 'facebook' ? 'Facebook' : 'Instagram' }}
-                                        </span>
+                                        @foreach($post->socialAccounts as $account)
+
+    <span class="cal-plat {{ $account->platform === 'facebook'
+        ? 'cal-plat-fb'
+        : 'cal-plat-ig' }}">
+
+        {{ ucfirst($account->platform) }}
+
+    </span>
+
+@endforeach
                                         <span class="cal-stat cal-stat-{{ $post->status }}">
                                             {{ match($post->status) {
                                                 'published' => '✅ Published',
@@ -196,7 +204,15 @@
                                     <div class="cal-meta">
 
                                         <span>
-                                            👤 {{ $post->socialAccount?->username }}
+                                            @foreach($post->socialAccounts as $account)
+
+    <span>
+        👤 {{ ucfirst($account->platform) }}
+        -
+        {{ $account->username }}
+    </span>
+
+@endforeach
                                         </span>
 
                                         @if ($post->scheduled_at)

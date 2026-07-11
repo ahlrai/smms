@@ -47,12 +47,14 @@ class SocialAccountResource extends Resource
         return auth()->user()?->hasPermissionTo('social.manage') ?? false;
     }
 
+    // form edit 
     public static function form(
         Schema $schema
     ): Schema {
 
         return $schema->schema([
 
+            // Menampilkan platform
             Select::make('platform')
                 ->label('Platform')
                 ->options([
@@ -73,6 +75,7 @@ class SocialAccountResource extends Resource
                     'Nama yang ditampilkan'
                 )
                 ->maxLength(255),
+                
 
         ]);
     }

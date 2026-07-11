@@ -64,7 +64,7 @@ class InstagramService
 
     /*
     |--------------------------------------------------------------------------
-    | GET INSTAGRAM ACCOUNT ID
+    |  Mengambil Instagram Business Account
     |--------------------------------------------------------------------------
     */
 
@@ -104,7 +104,7 @@ class InstagramService
 
     /*
     |--------------------------------------------------------------------------
-    | PROFILE
+    | MENGAMBIL DATA PROFIL INSTAGRAM
     |--------------------------------------------------------------------------
     */
 
@@ -620,6 +620,8 @@ public function replyComment(
         )->json();
     }
 
+
+    // MENGAMBIL LINK POSTINGAN INSTAGRAM SETELAH PUBLISH KONTEN
 public function getPostPermalink(
     string $mediaId,
     string $token
@@ -646,6 +648,7 @@ public function getPostPermalink(
     return $response['permalink'] ?? null;
 }
 
+// MENGIRIM BALASAN DM INSTAGRAM
 public function sendMessage(
     string $recipientId,
     string $message,
