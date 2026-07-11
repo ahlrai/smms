@@ -121,12 +121,31 @@
                                 <span>{{ $msg->sender_username ?: $msg->sender_id }}</span>
                                 <span class="inbox-time">{{ $msg->sent_at->format('d M Y H:i:s') }}</span>
                             </div>
-                            <div class="inbox-badges">
-                                <span class="badge badge-{{ $msg->platform }}">{{ ucfirst($msg->platform) }}</span>
-                                <span class="badge {{ match($msg->status) { 'new'=>'badge-new', 'follow-up'=>'badge-fu', default=>'badge-done' } }}">
-                                    {{ match($msg->status) { 'new'=>'Baru', 'follow-up'=>'Follow-up', default=>'Selesai' } }}
-                                </span>
-                            </div>
+                            @if($msg->socialAccount)
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:4px;">
+        <strong>{{ $msg->socialAccount->username }}</strong>
+    </div>
+@endif
+
+<div class="inbox-badges">
+
+    <span class="badge badge-{{ $msg->platform }}">
+        {{ ucfirst($msg->platform) }}
+    </span>
+
+    <span class="badge {{ match($msg->status){
+        'new'=>'badge-new',
+        'follow-up'=>'badge-fu',
+        default=>'badge-done'
+    } }}">
+        {{ match($msg->status){
+            'new'=>'Baru',
+            'follow-up'=>'Follow-up',
+            default=>'Selesai'
+        } }}
+    </span>
+
+</div>
                             <div class="inbox-preview">{{ $msg->message }}</div>
                         </div>
                     </div>
@@ -154,15 +173,33 @@
                         </div>
                         <div>
                             <div class="conv-name">
-                                {{ $selected->sender_username ?: $selected->sender_id }}
-                            </div>
-                            <div class="conv-sub">
-                                {{ ucfirst($selected->platform) }}
-                                &bull;
-                                <span class="badge {{ match($selected->status) { 'new'=>'badge-new', 'follow-up'=>'badge-fu', default=>'badge-done' } }}">
-                                    {{ match($selected->status) { 'new'=>'Baru', 'follow-up'=>'Follow-up', default=>'Selesai' } }}
-                                </span>
-                            </div>
+    {{ $selected->sender_username ?: $selected->sender_id }}
+</div>
+
+<div class="conv-sub">
+
+    @if($selected->socialAccount)
+        <strong>{{ $selected->socialAccount->username }}</strong>
+        &bull;
+    @endif
+
+    {{ ucfirst($selected->platform) }}
+
+    &bull;
+
+    <span class="badge {{ match($selected->status){
+        'new'=>'badge-new',
+        'follow-up'=>'badge-fu',
+        default=>'badge-done'
+    } }}">
+        {{ match($selected->status){
+            'new'=>'Baru',
+            'follow-up'=>'Follow-up',
+            default=>'Selesai'
+        } }}
+    </span>
+
+</div>
                         </div>
                     </div>
                     <div class="conv-actions">
@@ -181,10 +218,16 @@
                     <div class="msg-bubble msg-bubble-incoming">
                         <div class="bubble">{{ $selected->message }}</div>
                         <div class="msg-meta">
-                            {{ $selected->sender_username }}
-                            &bull;
-                            {{ $selected->sent_at?->format('d M Y, H:i') }}
-                        </div>
+
+    {{ $selected->sender_username }}
+
+    @if($selected->socialAccount)
+    @endif
+
+    &bull;
+    {{ $selected->sent_at?->format('d M Y, H:i') }}
+
+</div>
                     </div>
 
                     {{-- Replies --}}

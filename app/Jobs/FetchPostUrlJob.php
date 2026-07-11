@@ -15,77 +15,106 @@ class FetchPostUrlJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries   = 3;
-    public int $backoff = 30;
-    public int $timeout = 60;
-
-    public function __construct(public int $postId) {}
+    public function __construct(
+        public int $postId
+    ) {}
 
     public function handle(): void
     {
-        $post = Post::with('socialAccounts')->find($this->postId);
+        Log::info('=== FETCH POST URL JOB JALAN ===');
 
-        if (!$post || $post->status !== 'published') {
+        Log::info([
+            'post_id' => $this->postId,
+        ]);
+
+        $post = Post::find($this->postId);
+
+        if (!$post) {
+
+            Log::warning('Post tidak ditemukan');
+
             return;
         }
 
-        $firstUrl = null;
+        Log::info($post->toArray());
 
         foreach ($post->socialAccounts as $account) {
-            $pid = $account->pivot->platform_post_id;
-            if (!$pid) {
+
+            if (strtolower($account->platform) !== 'facebook') {
                 continue;
             }
 
-            // Skip if this account's URL is already saved
-            if ($account->pivot->post_url) {
-                if (!$firstUrl) $firstUrl = $account->pivot->post_url;
+            $platformPostId = $account->pivot->platform_post_id;
+
+            if (!$platformPostId) {
+
+                Log::warning('Platform Post ID kosong', [
+                    'account_id' => $account->id,
+                ]);
+
                 continue;
             }
-
-            $url = null;
 
             try {
-                if ($account->isInstagram()) {
-                    $res = Http::timeout(15)->get(
-                        "https://graph.facebook.com/v22.0/{$pid}",
-                        ['fields' => 'permalink', 'access_token' => $account->access_token]
-                    )->json();
-                    $url = $res['permalink'] ?? null;
-                    if (isset($res['error'])) {
-                        Log::warning('FetchPostUrlJob IG: ' . ($res['error']['message'] ?? 'unknown'));
-                    }
-                } elseif ($account->isFacebook()) {
-                    // Field yang tersedia untuk permalink bisa beda-beda antar tipe objek (feed/photo/video).
-                    // Kita coba dengan fallback.
-                    $res = Http::timeout(15)->get(
-                        "https://graph.facebook.com/v22.0/{$pid}",
-                        ['fields' => 'permalink_url,permalink', 'access_token' => $account->access_token]
-                    )->json();
 
-                    $url = $res['permalink_url']
-                        ?? $res['permalink']
-                        ?? null;
+                $response = Http::get(
 
-                    if (isset($res['error'])) {
-                        Log::warning('FetchPostUrlJob FB: ' . ($res['error']['message'] ?? 'unknown'));
-                    }
+                    "https://graph.facebook.com/v22.0/{$platformPostId}",
+
+                    [
+                        'fields' => 'permalink_url',
+
+                        'access_token' => $account->access_token,
+                    ]
+
+                )->json();
+
+                Log::info('FACEBOOK PERMALINK RESPONSE', $response);
+
+                $postUrl = $response['permalink_url'] ?? null;
+
+                if (!$postUrl) {
+
+                    Log::warning('Permalink Facebook belum tersedia');
+
+                    continue;
                 }
+
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE POSTS
+                |--------------------------------------------------------------------------
+                */
+
+                $post->update([
+                    'post_url' => $postUrl,
+                ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | UPDATE PIVOT
+                |--------------------------------------------------------------------------
+                */
+
+                $post->socialAccounts()->updateExistingPivot(
+                    $account->id,
+                    [
+                        'post_url' => $postUrl,
+                    ]
+                );
+
+                Log::info('Facebook URL berhasil disimpan', [
+                    'post_id' => $post->id,
+                    'url' => $postUrl,
+                ]);
+
             } catch (\Exception $e) {
-                Log::error("FetchPostUrlJob [{$account->platform}] post={$this->postId}: " . $e->getMessage());
-                continue;
-            }
 
-            if ($url) {
-                $post->socialAccounts()->updateExistingPivot($account->id, ['post_url' => $url]);
-                Log::info("FetchPostUrlJob: {$account->platform} post={$this->postId} → {$url}");
-                if (!$firstUrl) $firstUrl = $url;
+                Log::error(
+                    'Fetch Facebook URL gagal: ' .
+                    $e->getMessage()
+                );
             }
-        }
-
-        // Mirror the first URL to posts.post_url for easy display in the table
-        if ($firstUrl && $post->post_url !== $firstUrl) {
-            $post->update(['post_url' => $firstUrl]);
         }
     }
 }

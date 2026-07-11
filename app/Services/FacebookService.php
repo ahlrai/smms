@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use App\Models\SocialAccount;
 
 class FacebookService
 {
@@ -341,7 +340,7 @@ class FacebookService
 
                         'fields' =>
 
-                            'id,name,access_token,instagram_business_account{id,username,name}',
+                            'id,name,access_token,instagram_business_account',
 
                         'access_token' =>
 
@@ -599,7 +598,7 @@ class FacebookService
     |--------------------------------------------------------------------------
     */
 
-    public function fetchConversations($account): array
+        public function fetchConversations($account): array
 {
     try {
 

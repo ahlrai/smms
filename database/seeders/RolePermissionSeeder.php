@@ -2,10 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -44,9 +43,8 @@ class RolePermissionSeeder extends Seeder
         // Remove deprecated permissions that no longer belong to the canonical set
         Permission::whereNotIn('name', $allPermissions)->delete();
 
-        // Create new permissions idempotently
-        foreach ($allPermissions as $name) {
-            Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+        foreach ($permissions as $perm) {
+            Permission::firstOrCreate(['name' => $perm]);
         }
 
         // ── 2. ROLES & THEIR PERMISSIONS ────────────────────────────────────

@@ -113,9 +113,15 @@
             ? 'cal-badge-fb'
             : 'cal-badge-ig') }}">
 
-        <div style="font-size:10px;font-weight:700;">
-            {{ \Carbon\Carbon::parse($post->scheduled_at)->format('H:i') }}
-        </div>
+        @php
+    $displayTime = $post->status === 'scheduled'
+        ? $post->scheduled_at
+        : ($post->published_at ?? $post->scheduled_at);
+@endphp
+
+<div style="font-size:10px;font-weight:700;">
+    {{ \Carbon\Carbon::parse($displayTime)->format('H:i') }}
+</div>
 
         <div>
             {{ \Illuminate\Support\Str::limit(
@@ -168,9 +174,17 @@
                             @foreach ($selPosts as $post)
                                 <div class="cal-card">
                                     <div class="cal-card-top">
-                                        <span class="cal-plat {{ $post->platform === 'facebook' ? 'cal-plat-fb' : 'cal-plat-ig' }}">
-                                            {{ $post->platform === 'facebook' ? 'Facebook' : 'Instagram' }}
-                                        </span>
+                                        @foreach($post->socialAccounts as $account)
+
+    <span class="cal-plat {{ $account->platform === 'facebook'
+        ? 'cal-plat-fb'
+        : 'cal-plat-ig' }}">
+
+        {{ ucfirst($account->platform) }}
+
+    </span>
+
+@endforeach
                                         <span class="cal-stat cal-stat-{{ $post->status }}">
                                             {{ match($post->status) {
                                                 'published' => '✅ Published',
@@ -190,7 +204,15 @@
                                     <div class="cal-meta">
 
                                         <span>
-                                            👤 {{ $post->socialAccount?->username }}
+                                            @foreach($post->socialAccounts as $account)
+
+    <span>
+        👤 {{ ucfirst($account->platform) }}
+        -
+        {{ $account->username }}
+    </span>
+
+@endforeach
                                         </span>
 
                                         @if ($post->scheduled_at)

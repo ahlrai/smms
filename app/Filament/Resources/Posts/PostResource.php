@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Posts;
 use App\Filament\Resources\Posts\Pages;
 use App\Jobs\FetchPostUrlJob;
 use App\Models\Post;
+use App\Models\CustomNotification;
 use App\Models\SocialAccount;
 
 use Cloudinary\Cloudinary;
@@ -83,16 +84,18 @@ class PostResource extends Resource
     |--------------------------------------------------------------------------
     | PUBLISH INSTAGRAM
     |--------------------------------------------------------------------------
-    */
+    */ // Fungsi utama untuk mempublikasikan post ke Instagram. upload media, membuat media container, mem-publish ke Instagram, lalu menyimpan ID post dan URL post.
 
     public static function publishInstagram(Post $post)
     {
+        // Melakukan publish ke setiap akun Instagram yang dipilih pada post (Perulangan Multi Akun)
         foreach ($post->socialAccounts as $acc) {
 
             if (strtolower($acc->platform) !== 'instagram') {
                 continue;
             }
 
+            // Mengambil Page Access Token dan Instagram Business Account ID
             $token = $acc->access_token;
 
             $igId = $acc->account_id;
@@ -109,7 +112,7 @@ class PostResource extends Resource
 
             /*
             |--------------------------------------------------------------------------
-            | CLOUDINARY
+            | CLOUDINARY agar menghasilkan URL publik. URL tersebut menjadi syarat Graph API untuk publish ke Instagram.
             |--------------------------------------------------------------------------
             */
 
@@ -160,6 +163,7 @@ $isVideo =
 
 $filePath = public_path('storage/' . $media);
 
+// Upload file ke Cloudinary dan menghasilkan URL publik
 $upload =
     $cloudinary->uploadApi()->upload(
         $filePath,
@@ -220,6 +224,7 @@ if ($isVideo) {
 
     $status = null;
 
+    // Menunggu proses encoding video selesai di server Meta
     for ($i = 0; $i < 12; $i++) {
 
         sleep(10);
@@ -301,6 +306,11 @@ if ($postId) {
 
 \Log::info('POST URL');
 \Log::info([$postUrl]);
+
+// Menyimpan URL postingan ke tabel posts
+$post->update([
+    'post_url' => $postUrl,
+]);
 
                 // Simpan ke pivot post_social_accounts (untuk sync komentar)
                 $post->socialAccounts()->updateExistingPivot($acc->id, [
@@ -523,6 +533,10 @@ $postUrl =
     $latestPost['data'][0]['permalink']
     ?? null;
 
+$post->update([
+    'post_url' => $postUrl,
+]);
+
 $post->socialAccounts()
         ->updateExistingPivot(
         $acc->id,
@@ -561,6 +575,7 @@ $post->socialAccounts()
 
     public static function publishFacebook(Post $post): array
     {
+        // Publish ke setiap akun Facebook yang dipilih
         foreach ($post->socialAccounts as $acc) {
             if (strtolower($acc->platform) !== 'facebook') {
                 continue;
@@ -599,64 +614,144 @@ $post->socialAccounts()
                 'url' => ['secure' => true],
             ]);
 
-            // Single image or video
-            if (count($allMedia) === 1) {
-                $media    = str_replace('storage/', '', $allMedia[0]);
-                $filePath = public_path('storage/' . $media);
-                $mimeType = mime_content_type($filePath);
-                $isVideo  = str_starts_with($mimeType, 'video/');
+ // Single image or video
+if (count($allMedia) === 1) {
 
-                $upload = $cloudinary->uploadApi()->upload($filePath, [
-                    'resource_type' => $isVideo ? 'video' : 'image',
-                ]);
-                $url = $upload['secure_url'];
+    $media    = str_replace('storage/', '', $allMedia[0]);
+    $filePath = public_path('storage/' . $media);
+    $mimeType = mime_content_type($filePath);
+    $isVideo  = str_starts_with($mimeType, 'video/');
 
-                if ($isVideo) {
-                    $res = Http::post("https://graph.facebook.com/v22.0/{$pageId}/videos", [
-                        'file_url'     => $url,
-                        'description'  => $post->caption,
+    $upload = $cloudinary->uploadApi()->upload(
+        $filePath,
+        [
+            'resource_type' => $isVideo ? 'video' : 'image',
+        ]
+    );
+
+    $url = $upload['secure_url'];
+
+    if ($isVideo) {
+
+        $res = Http::post(
+            "https://graph.facebook.com/v22.0/{$pageId}/videos",
+            [
+                'file_url'     => $url,
+                'description'  => $post->caption,
+                'access_token' => $token,
+            ]
+        )->json();
+
+        if (isset($res['error'])) {
+            return [
+                'success' => false,
+                'message' => $res['error']['message'],
+            ];
+        }
+
+        $mediaId = $res['id'] ?? null;
+
+        // Poll Facebook video processing (max 2 min)
+        if ($mediaId) {
+
+            for ($i = 0; $i < 12; $i++) {
+
+                sleep(10);
+
+                $status = Http::get(
+                    "https://graph.facebook.com/v22.0/{$mediaId}",
+                    [
+                        'fields'       => 'status',
                         'access_token' => $token,
-                    ])->json();
+                    ]
+                )->json();
 
-                    if (isset($res['error'])) {
-                        return ['success' => false, 'message' => $res['error']['message']];
-                    }
+                $videoStatus = $status['status']['video_status'] ?? null;
 
-                    $mediaId = $res['id'] ?? null;
-
-                    // Poll Facebook video processing (max 2 min)
-                    if ($mediaId) {
-                        for ($i = 0; $i < 12; $i++) {
-                            sleep(10);
-                            $status = Http::get("https://graph.facebook.com/v22.0/{$mediaId}", [
-                                'fields'       => 'status',
-                                'access_token' => $token,
-                            ])->json();
-                            $videoStatus = $status['status']['video_status'] ?? null;
-                            if ($videoStatus === 'ready' || $videoStatus === 'complete') break;
-                        }
-                    }
-                } else {
-                    $res = Http::post("https://graph.facebook.com/v22.0/{$pageId}/photos", [
-                        'url'          => $url,
-                        'caption'      => $post->caption,
-                        'access_token' => $token,
-                    ])->json();
-
-                    if (isset($res['error'])) {
-                        return ['success' => false, 'message' => $res['error']['message']];
-                    }
-
-                    // /photos returns both `id` (photo object) and `post_id` (feed post).
-                    // We must store post_id — only feed post IDs support permalink_url in FetchPostUrlJob.
-                    $mediaId = $res['post_id'] ?? $res['id'] ?? null;
+                if (
+                    $videoStatus === 'ready' ||
+                    $videoStatus === 'complete'
+                ) {
+                    break;
                 }
+            }
+        }
 
-                $post->socialAccounts()->updateExistingPivot($acc->id, [
-                    'platform_post_id' => $mediaId,
-                ]);
+    } else {
 
-                return ['success' => true, 'post_id' => $mediaId];
+        $res = Http::post(
+            "https://graph.facebook.com/v22.0/{$pageId}/photos",
+            [
+                'url'          => $url,
+                'caption'      => $post->caption,
+                'access_token' => $token,
+            ]
+        )->json();
+
+        if (isset($res['error'])) {
+            return [
+                'success' => false,
+                'message' => $res['error']['message'],
+            ];
+        }
+
+        // Simpan post_id yang nanti dipakai mengambil permalink
+        $mediaId = $res['post_id'] ?? null;
+    }
+    \Log::info($res);
+
+    $postUrl = null;
+
+/*
+|--------------------------------------------------------------------------
+| Ambil permalink Facebook
+|--------------------------------------------------------------------------
+*/
+
+// Setelah post berhasil dipublish, sistem mengambil permalink menggunakan Graph API agar URL postingan dapat disimpan ke database.
+// Mengulang request maksimal 5 kali karena permalink terkadang tidak langsung tersedia setelah publish.
+for ($i = 0; $i < 5; $i++) {
+
+    sleep(3);
+
+    $info = Http::get(
+        "https://graph.facebook.com/v22.0/{$mediaId}",
+        [
+            'fields' => 'permalink_url',
+            'access_token' => $token,
+        ]
+    )->json();
+
+    $postUrl = $info['permalink_url'] ?? null;
+
+    if ($postUrl && str_starts_with($postUrl, '/')) {
+        $postUrl = 'https://www.facebook.com' . $postUrl;
+    }
+
+    if ($postUrl) {
+        break;
+    }
+}
+
+// Menyimpan URL postingan Facebook ke tabel posts
+$post->update([
+    'post_url' => $postUrl,
+]);
+
+//  Menyimpan Platform Post ID dan URL Post ke pivot table post_social_accounts agar dapat digunakan untuk sinkronisasi komentar
+$post->socialAccounts()->updateExistingPivot(
+    $acc->id,
+    [
+        'platform_post_id' => $mediaId,
+        'post_url'         => $postUrl,
+    ]
+);
+
+return [
+    'success'  => true,
+    'post_id'  => $mediaId,
+    'post_url' => $postUrl,
+];
             }
 
             // Multiple images → upload each as unpublished, then create feed post
@@ -693,13 +788,51 @@ $post->socialAccounts()
 
             $postId = $feedRes['id'] ?? null;
 
-            $post->socialAccounts()->updateExistingPivot($acc->id, [
-                'platform_post_id' => $postId,
-                'post_url'         => null,
-            ]);
+$postUrl = null;
 
-            return ['success' => true, 'post_id' => $postId];
+/*
+|--------------------------------------------------------------------------
+| Ambil permalink Facebook
+|--------------------------------------------------------------------------
+*/
 
+for ($i = 0; $i < 5; $i++) {
+
+    sleep(3);
+
+    $info = Http::get(
+        "https://graph.facebook.com/v22.0/{$postId}",
+        [
+            'fields' => 'permalink_url',
+            'access_token' => $token,
+        ]
+    )->json();
+
+    if (!empty($info['permalink_url'])) {
+
+        $postUrl = $info['permalink_url'];
+
+        break;
+    }
+}
+
+$post->update([
+    'post_url' => $postUrl,
+]);
+
+$post->socialAccounts()->updateExistingPivot(
+    $acc->id,
+    [
+        'platform_post_id' => $postId,
+        'post_url'         => $postUrl,
+    ]
+);
+
+return [
+    'success'  => true,
+    'post_id'  => $postId,
+    'post_url' => $postUrl,
+];
         }
 
         return ['success' => false, 'message' => 'Akun Facebook tidak ditemukan'];
@@ -715,8 +848,10 @@ $post->socialAccounts()
     {
         return $schema->schema([
 
+            // Memilih satu atau lebih akun sosial tujuan posting
             Select::make('social_account_ids')
                 ->label('Akun Sosial')
+                // Mengizinkan memilih lebih dari satu akun sosial
                 ->multiple()
                 ->options(
                     SocialAccount::all()->mapWithKeys(function ($account) {
@@ -800,6 +935,7 @@ $post->socialAccounts()
 
                 ->downloadable()
 
+                // Mengatur urutan media untuk carousel
                 ->reorderable()
 
                 ->appendFiles()
@@ -901,23 +1037,31 @@ $post->socialAccounts()
                     ->dateTime('d M Y H:i')
                     ->sortable(),
 
-                TextColumn::make('platform_urls')
-                    ->label('URL Post')
-                    ->getStateUsing(function (Post $record): string {
-                        $links = $record->publishResults
-                            ->filter(fn ($r) => $r->post_url)
-                            ->map(function ($r) {
-                                $platform = $r->socialAccount?->platform ?? 'unknown';
-                                $label    = strtoupper($platform);
-                                $color    = $platform === 'instagram' ? '#E1306C' : '#1877F2';
-                                return "<a href=\"{$r->post_url}\" target=\"_blank\" "
-                                    . "style=\"color:{$color};font-weight:600;margin-right:8px;\">"
-                                    . "{$label} ↗</a>";
-                            });
+                TextColumn::make('post_url')
+    ->label('URL Post')
+    ->html()
+    ->formatStateUsing(function ($state, $record) {
 
-                        return $links->isNotEmpty() ? $links->implode(' ') : '—';
-                    })
-                    ->html(),
+        $html = '';
+
+        foreach ($record->socialAccounts as $account) {
+
+            if (!$account->pivot->post_url) {
+                continue;
+            }
+
+            $platform = ucfirst($account->platform);
+
+            $html .= "<div style='margin-bottom:8px'>
+                        <strong>{$platform}</strong><br>
+                        <a href='{$account->pivot->post_url}' target='_blank'>
+                            {$account->pivot->post_url}
+                        </a>
+                      </div>";
+        }
+
+        return new HtmlString($html);
+    }),
 
                 TextColumn::make('created_at')
                     ->label('Dibuat')
@@ -1021,6 +1165,7 @@ $post->socialAccounts()
             $account?->username
             ?? 'instagram_user';
 
+        // Mengambil seluruh platform tujuan, inti bisa multi platform
         $platforms =
            $record->socialAccounts
                 ->pluck('platform')
@@ -1298,8 +1443,27 @@ if (in_array('facebook', $platforms)) {
                                 'status'       => 'published',
                                 'published_at' => now(),
                             ]);
+
+                            CustomNotification::notifyUser(
+    userId: $record->created_by,
+
+    title: 'Post Berhasil Dipublish ✅',
+
+    message: 'Konten berhasil dipublikasikan.',
+
+    type: 'success',
+
+    platform: $record->platform,
+
+    postTitle: $record->title,
+
+    status: 'published',
+
+    postUrl: $record->post_url,
+
+    actionUrl: '/admin/posts'
+);
                             // Fetch post URLs in background after platform processes the post
-                            FetchPostUrlJob::dispatch($record->id)->delay(now()->addSeconds(30));
                             Notification::make()
                                 ->title('Post berhasil dipublish')
                                 ->success()

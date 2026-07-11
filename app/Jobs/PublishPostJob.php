@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\Post;
 use App\Models\CustomNotification;
-use App\Jobs\FetchPostUrlJob;
 use App\Services\FacebookService;
 use App\Services\InstagramService;
 
@@ -134,15 +133,19 @@ class PublishPostJob implements ShouldQueue
                 |--------------------------------------------------------------------------
                 */
 
-                elseif (strtolower($account->platform) === 'facebook') {
-                    $result =
-                        \App\Filament\Resources\Posts\PostResource
-                        ::publishFacebook($post);
+              elseif (strtolower($account->platform) === 'facebook') {
 
-                    if (!$result['success']) {
-                        throw new \Exception($result['message']);
-                    }
-                }
+    $result =
+        \App\Filament\Resources\Posts\PostResource
+        ::publishFacebook($post);
+
+    if (!$result['success']) {
+
+        throw new \Exception(
+            $result['message']
+        );
+    }
+}
             }
 
             /*
@@ -186,7 +189,6 @@ class PublishPostJob implements ShouldQueue
 
     actionUrl: '/admin/posts'
 );
-            FetchPostUrlJob::dispatch($post->id)->delay(now()->addSeconds(30));
             Log::info(
                 'POST BERHASIL DIPUBLISH ID: '
                     . $post->id

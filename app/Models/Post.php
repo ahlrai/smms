@@ -13,17 +13,18 @@ class Post extends Model
     use HasFactory;
 
     protected $fillable = [
-        'social_account_id',
-        'platform',
-        'title',
-        'caption',
-        'media',
-        'status',
-        'post_url',
-        'scheduled_at',
-        'published_at',
-        'fail_reason',
-        'created_by',
+    'social_account_id',
+    'platform',
+    'title',
+    'caption',
+    'media',
+    'status',
+    'platform_post_id',
+    'scheduled_at',
+    'published_at',
+    'fail_reason',
+    'created_by',
+    'post_url',
     ];
 
     protected $casts = [
