@@ -33,13 +33,16 @@ class MessagesTable
                     ->boolean(),
                 TextColumn::make('sent_at')
                     ->dateTime()
+                    ->timezone('Asia/Jakarta')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
+                    ->timezone('Asia/Jakarta')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
                     ->dateTime()
+                    ->timezone('Asia/Jakarta')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])

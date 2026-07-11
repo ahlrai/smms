@@ -15,6 +15,8 @@ class RolePermissionSeeder extends Seeder
 
         // ── 1. DEFINE ALL PERMISSIONS ───────────────────────────────────────
         $allPermissions = [
+            // Panel entry — every user who may log in must have this
+            'panel.access',
             // Posts
             'post.create',
             'post.edit',
@@ -35,6 +37,8 @@ class RolePermissionSeeder extends Seeder
             // User management
             'users.manage',
             'roles.manage',
+            // Notifications
+            'notifications.view',
         ];
 
         // Remove deprecated permissions that no longer belong to the canonical set
@@ -46,33 +50,52 @@ class RolePermissionSeeder extends Seeder
         }
 
         // ── 2. ROLES & THEIR PERMISSIONS ────────────────────────────────────
+        // Roles are permission bundles only. Authorization checks always use
+        // hasPermissionTo(), never hasRole(). Assigning a role grants its
+        // bundled permissions — nothing more.
+
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         $admin->syncPermissions(Permission::all());
 
+        // staff: full social-media operator — posts, inbox, comments, analytics
         $staff = Role::firstOrCreate(['name' => 'staff', 'guard_name' => 'web']);
         $staff->syncPermissions([
+            'panel.access',
             'post.create',
+            'post.edit',
             'post.schedule',
-            'comment.view',
-            'comment.reply',
-            'message.view',
-            'message.reply',
+            'post.publish',
             'analytics.view',
+            'notifications.view',
         ]);
 
-        // ── 3. ASSIGN ROLES TO EXISTING USERS ───────────────────────────────
-        $assignments = [
-            'admin@example.com'           => 'admin',
-            'admin@gmail.com'             => 'admin',
-            'raihanahanasahlla@gmail.com' => 'admin',
-            'staff1@example.com'          => 'staff',
-            'staff2@example.com'          => 'staff',
-        ];
+        // content_creator: only creates and schedules posts — nothing else visible
+        $contentCreator = Role::firstOrCreate(['name' => 'content_creator', 'guard_name' => 'web']);
+        $contentCreator->syncPermissions([
+            'panel.access',
+            'post.create',
+            'post.schedule',
+            'post.publish',
+            'analytics.view',
+            'notifications.view',
+        ]);
 
-        $emailCol = 'email';
-        foreach ($assignments as $emailAddress => $roleName) {
-            $user = User::firstWhere($emailCol, $emailAddress);
-            $user?->syncRoles([$roleName]);
+        // social_manager: manages connected social accounts only
+        $socialManager = Role::firstOrCreate(['name' => 'social_manager', 'guard_name' => 'web']);
+        $socialManager->syncPermissions([
+            'panel.access',
+            'analytics.view',
+            'notifications.view',
+            'social.manage',
+        ]);
+
+        // ── 3. SEED INITIAL ADMIN ───────────────────────────────────────────
+        // Assigns admin role to the email in ADMIN_EMAIL env var (dev bootstrap only).
+        // In production, assign roles through the Users management page instead.
+        $adminEmail = env('ADMIN_EMAIL');
+        if ($adminEmail) {
+            $user = User::firstWhere('email', $adminEmail);
+            $user?->syncRoles(['admin']);
         }
 
         // ── 4. CLEAR CACHE ──────────────────────────────────────────────────

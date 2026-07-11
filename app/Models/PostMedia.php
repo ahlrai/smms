@@ -46,7 +46,10 @@ class PostMedia extends Model
     // Ambil URL publik file
     public function getUrlAttribute(): string
     {
-        return Storage::url($this->file_path);
+        return $this->socialAccounts
+        ->first()
+        ?->pivot
+        ?->post_url;
     }
 
     // Ukuran file dalam format yang mudah dibaca (KB, MB)

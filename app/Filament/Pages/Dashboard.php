@@ -6,11 +6,21 @@ use App\Filament\Widgets\ConnectedAccountsWidget;
 use App\Filament\Widgets\DashboardStatsWidget;
 use App\Filament\Widgets\RecentMessagesWidget;
 use App\Filament\Widgets\RecentPostsWidget;
+use App\Filament\Widgets\RecentCommentsWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
 {
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
+
+    public static function canAccess(): bool
+    {
+        try {
+            return auth()->user()?->hasPermissionTo('panel.access') ?? false;
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
+            return auth()->user()?->roles()->exists() ?? false;
+        }
+    }
     protected static ?string $navigationLabel = 'Dashboard';
     protected static ?string $title           = 'Dashboard';
     protected static ?int    $navigationSort  = 1;
@@ -22,6 +32,7 @@ class Dashboard extends BaseDashboard
             ConnectedAccountsWidget::class,
             RecentMessagesWidget::class,
             RecentPostsWidget::class,
+            RecentCommentsWidget::class,
         ];
     }
 

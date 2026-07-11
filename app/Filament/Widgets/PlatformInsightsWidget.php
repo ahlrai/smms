@@ -15,6 +15,11 @@ class PlatformInsightsWidget extends Widget
     protected static ?int $sort             = 4;
     protected int|string|array $columnSpan  = 'full';
 
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasPermissionTo('analytics.view') ?? false;
+    }
+
     protected function getViewData(): array
     {
         $data = Cache::remember('platform_insights_widget', now()->addMinutes(30), function () {

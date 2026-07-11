@@ -14,29 +14,46 @@ class PostsTable
     {
         return $table
             ->columns([
-                TextColumn::make('socialAccount.id')
-                    ->searchable(),
+                TextColumn::make('title')
+                    ->searchable()
+                    ->limit(40),
                 TextColumn::make('platform')
-                    ->searchable(),
+                    ->searchable()
+                    ->badge(),
                 TextColumn::make('status')
-                    ->searchable(),
-                TextColumn::make('platform_post_id')
-                    ->searchable(),
+                    ->searchable()
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'published' => 'success',
+                        'scheduled' => 'warning',
+                        'failed'    => 'danger',
+                        default     => 'gray',
+                    }),
+                TextColumn::make('post_url')
+                    ->label('Post URL')
+                    ->url(fn ($record) => $record->post_url)
+                    ->openUrlInNewTab()
+                    ->formatStateUsing(fn ($state) => $state ? 'Lihat Post ↗' : '—')
+                    ->color('primary'),
                 TextColumn::make('scheduled_at')
-                    ->dateTime()
+                    ->dateTime('d M Y, H:i')
+                    ->timezone('Asia/Jakarta')
                     ->sortable(),
                 TextColumn::make('published_at')
-                    ->dateTime()
+                    ->dateTime('d M Y, H:i')
+                    ->timezone('Asia/Jakarta')
                     ->sortable(),
-                TextColumn::make('created_by')
-                    ->numeric()
+                TextColumn::make('creator.name')
+                    ->label('Dibuat oleh')
                     ->sortable(),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->dateTime('d M Y, H:i')
+                    ->timezone('Asia/Jakarta')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->dateTime('d M Y, H:i')
+                    ->timezone('Asia/Jakarta')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])

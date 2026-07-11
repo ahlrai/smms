@@ -13,6 +13,11 @@ class StatsOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
 
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasPermissionTo('analytics.view') ?? false;
+    }
+
     protected function getStats(): array
     {
         $twLikes       = Metric::where('recorded_date', '>=', now()->subDays(6)->toDateString())->sum('likes');
@@ -43,17 +48,17 @@ class StatsOverviewWidget extends BaseWidget
                 ->color('info')
                 ->chart($this->sparkline('comments')),
 
-            Stat::make('Total Reach', $this->fmt($twReach))
-                ->description($this->trend($twReach, $lwReach) . ' vs minggu lalu')
-                ->descriptionIcon($twReach >= $lwReach ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
-                ->color($twReach >= $lwReach ? 'success' : 'danger')
-                ->chart($this->sparkline('reach')),
+            //Stat::make('Total Reach', $this->fmt($twReach))
+                //->description($this->trend($twReach, $lwReach) . ' vs minggu lalu')
+                //->descriptionIcon($twReach >= $lwReach ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
+                //->color($twReach >= $lwReach ? 'success' : 'danger')
+                //->chart($this->sparkline('reach')),
 
-            Stat::make('Impressions', $this->fmt($twImpressions))
-                ->description($this->trend($twImpressions, $lwImpressions) . ' vs minggu lalu')
-                ->descriptionIcon($twImpressions >= $lwImpressions ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
-                ->color($twImpressions >= $lwImpressions ? 'success' : 'warning')
-                ->chart($this->sparkline('impressions')),
+            //Stat::make('Impressions', $this->fmt($twImpressions))
+                //->description($this->trend($twImpressions, $lwImpressions) . ' vs minggu lalu')
+                //->descriptionIcon($twImpressions >= $lwImpressions ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
+                //->color($twImpressions >= $lwImpressions ? 'success' : 'warning')
+                //->chart($this->sparkline('impressions')),
 
             Stat::make('Pesan Masuk', Message::count())
                 ->description($unreadMessages . ' belum dibaca')

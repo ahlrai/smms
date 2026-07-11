@@ -97,8 +97,22 @@ class CommentResource extends Resource
                 TextColumn::make('commented_at')
                     ->label('Waktu')
                     ->dateTime('d M Y')
+                    ->timezone(config('app.timezone'))
                     ->sortable()
                     ->grow(false),
+                TextColumn::make('view_post')
+                    ->label('Link')
+                    ->state('View Post')
+                    ->badge()
+                    ->color('success')
+                    ->url(function (Comment $record) {
+
+                        return $record->post?->socialAccounts()
+                            ->where('platform', $record->platform)
+                            ->first()?->pivot?->post_url;
+
+                    })
+    ->openUrlInNewTab(),
             ])
             ->defaultSort('commented_at', 'desc')
             ->filters([
@@ -126,6 +140,8 @@ class CommentResource extends Resource
                             'reply'      => $data['reply'],
                             'replied_by' => auth()->id(),
                         ]);
+
+                    
 
                         if (!$record->platform_comment_id || !$record->socialAccount) {
                             $record->markAsReplied();
@@ -178,10 +194,11 @@ class CommentResource extends Resource
                                 ->warning()
                                 ->send();
                         }
+                    
                     }),
 
-                DeleteAction::make(),
             ]);
+            
     }
 
     public static function getPages(): array

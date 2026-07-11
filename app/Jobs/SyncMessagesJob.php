@@ -82,7 +82,7 @@ foreach ($messages as $msg) {
                     'status'              => 'new',
                     'is_read'             => false,
                     'sent_at' => isset($msg['created_time'])
-    ? \Carbon\Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
+    ? Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
     : now(),
                 ]);
 
@@ -129,7 +129,7 @@ foreach ($messages as $msg) {
                     'status'              => 'new',
                     'is_read'             => false,
                     'sent_at' => isset($msg['created_time'])
-                    ? \Carbon\Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
+                    ? Carbon::parse($msg['created_time'])->setTimezone(config('app.timezone'))
                     : now(),
                 ]);
 

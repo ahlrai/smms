@@ -24,6 +24,11 @@ class Notifications extends Page
     protected string $view =
         'filament.pages.notifications';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasPermissionTo('notifications.view') ?? false;
+    }
+
     public Collection $notifications;
 
     public int $unreadCount = 0;

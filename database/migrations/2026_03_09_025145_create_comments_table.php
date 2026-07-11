@@ -29,7 +29,7 @@ return new class extends Migration
             $table->boolean('is_replied')->default(false);
             $table->boolean('is_hidden')->default(false);    // Untuk hide/unhide komentar
             $table->string('parent_comment_id')->nullable(); // Jika ini adalah reply dari komentar lain
-            $table->timestamp('commented_at');               // Waktu komentar dari platform
+            $table->dateTime('commented_at');               // Waktu komentar dari platform
             $table->timestamps();
 
             $table->index('post_id');

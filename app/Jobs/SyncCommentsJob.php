@@ -81,75 +81,96 @@ class SyncCommentsJob implements ShouldQueue
 
 
     private function syncFacebookComments($post, $account, string $facebookPostID, FacebookService $fb): void
-    {
-        $comments = $fb->fetchComments($account, $facebookPostID);
-        $newCount = 0;
+{
+    $comments = $fb->fetchComments($account, $facebookPostID);
 
-        foreach ($comments as $comment) {
-            $exists = Comment::where('platform_comment_id', $comment['id'])->exists();
-            if ($exists) continue;
+    $newCount = 0;
 
-            Comment::create([
+    foreach ($comments as $comment) {
+
+        $record = Comment::updateOrCreate(
+            [
+                'platform_comment_id' => $comment['id'],
+            ],
+            [
                 'post_id'             => $post->id,
                 'social_account_id'   => $account->id,
-                'platform_comment_id' => $comment['id'],
                 'commenter_id'        => $comment['from']['id'] ?? null,
                 'commenter_username'  => $comment['from']['name'] ?? 'Unknown',
                 'platform'            => 'facebook',
                 'content'             => $comment['message'] ?? '',
                 'like_count'          => $comment['like_count'] ?? 0,
-                'is_replied'          => false,
-                'commented_at'        => Carbon::parse($comment['created_time'] ?? now()),
-            ]);
+                'commented_at'        => isset($comment['created_time'])
+                    ? Carbon::parse($comment['created_time'])
+                        ->setTimezone(config('app.timezone'))
+                    : now(),
+            ]
+        );
 
-            $newCount++;
-        }
-
-        if ($newCount > 0) {
-            CustomNotification::notifyUser(
-                $post->created_by,
-                $newCount . ' Komentar Facebook Baru 💭',
-                'Post "' . substr($post->caption, 0, 40) . '..." mendapat ' . $newCount . ' komentar baru',
-                'comment',
-                '/admin/comments'
-            );
+        if ($record->wasRecentlyCreated) {
+            $record->update([
+        'is_replied' => false,
+    ]);
         }
     }
+
+    if ($newCount > 0) {
+        CustomNotification::notifyUser(
+            $post->created_by,
+            $newCount . ' Komentar Facebook Baru 💭',
+            'Post "' . substr($post->caption, 0, 40) . '..." mendapat ' . $newCount . ' komentar baru',
+            'comment',
+            '/admin/comments'
+        );
+    }
+}
 
     private function syncInstagramComments($post, $account, string $instagramPostId, InstagramService $ig): void
-    {
+{
+    $comments = $ig->fetchComments($account, $instagramPostId);
 
-        $comments = $ig->fetchComments($account, $instagramPostId);
-        $newCount = 0;
+    $newCount = 0;
 
-        foreach ($comments as $comment) {
-            $exists = Comment::where('platform_comment_id', $comment['id'])->exists();
-            if ($exists) continue;
+    foreach ($comments as $comment) {
 
-            Comment::create([
+        $record = Comment::updateOrCreate(
+            [
+                'platform_comment_id' => $comment['id'],
+            ],
+            [
                 'post_id'             => $post->id,
                 'social_account_id'   => $account->id,
-                'platform_comment_id' => $comment['id'],
                 'commenter_id'        => $comment['from']['id'] ?? null,
-                'commenter_username'  => $comment['from']['username'] ?? $comment['username'] ?? 'Unknown',
+                'commenter_username'  => $comment['from']['username']
+                    ?? $comment['username']
+                    ?? 'Unknown',
                 'platform'            => 'instagram',
-                'content'             => $comment['text'] ?? $comment['message']?? '',
+                'content'             => $comment['text']
+                    ?? $comment['message']
+                    ?? '',
                 'like_count'          => $comment['like_count'] ?? 0,
-                'is_replied'          => false,
-                'commented_at'        => Carbon::parse($comment['timestamp'] ?? $comment['created_time'] ?? now()),
-            ]);
+                'commented_at'        => isset($comment['created_time'])
+                    ? Carbon::parse($comment['created_time'])
+                        ->setTimezone(config('app.timezone'))
+                    : now(),
+            ]
+        );
 
-            $newCount++;
-        }
-
-        if ($newCount > 0) {
-            CustomNotification::notifyUser(
-                $post->created_by,
-                $newCount . ' Komentar Instagram Baru 💭',
-                'Post "' . substr($post->caption, 0, 40) . '..." mendapat ' . $newCount . ' komentar baru',
-                'comment',
-                '/admin/comments'
-            );
+        if ($record->wasRecentlyCreated) {
+            $record->update([
+        'is_replied' => false,
+    ]);
         }
     }
+
+    if ($newCount > 0) {
+        CustomNotification::notifyUser(
+            $post->created_by,
+            $newCount . ' Komentar Instagram Baru 💭',
+            'Post "' . substr($post->caption, 0, 40) . '..." mendapat ' . $newCount . ' komentar baru',
+            'comment',
+            '/admin/comments'
+        );
+    }
+}
 }

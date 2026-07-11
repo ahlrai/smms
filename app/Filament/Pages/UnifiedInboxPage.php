@@ -21,6 +21,11 @@ class UnifiedInboxPage extends Page
 
     protected string $view = 'filament.pages.unified-inbox';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasPermissionTo('message.view') ?? false;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | STATE
@@ -153,6 +158,7 @@ class UnifiedInboxPage extends Page
     InstagramService $ig,
     FacebookService $fb
 ): void{
+    abort_unless(auth()->user()?->hasPermissionTo('message.reply'), 403);
 
     $reply = trim($this->replyText);
 
@@ -201,8 +207,8 @@ if ($message->platform === 'facebook') {
 
     $result = $fb->sendMessage(
         recipientId: $message->sender_id,
-        message: $reply,
-        token: $account->access_token
+        text: $reply,
+        pageToken: $account->access_token
     );
 
     if (config('app.debug')) {

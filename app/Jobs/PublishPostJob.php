@@ -142,54 +142,7 @@ class PublishPostJob implements ShouldQueue
                     if (!$result['success']) {
                         throw new \Exception($result['message']);
                     }
-
-
-    $imageUrl =
-        $post->media_urls[0] ?? null;
-
-    if (!$imageUrl) {
-
-        throw new \Exception(
-            'Gambar Facebook tidak ditemukan'
-        );
-    }
-
-    $result =
-        $fb->publishPhoto(
-
-            $account->account_id,
-
-            $account->access_token,
-
-            $post->caption ?? '',
-
-            $imageUrl
-
-        );
-
-    if (!isset($result['id'])) {
-
-        throw new \Exception(
-
-            $result['error']['message']
-            ??
-
-            'Facebook publish gagal'
-
-        );
-    }
-
-    $post->update([
-
-        'platform_post_id' =>
-            $result['id'],
-
-        'post_url' =>
-            'https://facebook.com/' .
-            $result['id']
-
-    ]);
-}
+                }
             }
 
             /*

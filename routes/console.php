@@ -122,7 +122,7 @@ Schedule::job(new SyncMessagesJob)
 
 Schedule::job(new SyncCommentsJob)
 
-    ->everyFiveMinutes()
+    ->everyMinute()
 
     ->name('sync-comments')
 
@@ -137,7 +137,7 @@ Schedule::job(new SyncCommentsJob)
 
 Schedule::job(new SyncMetricsJob)
 
-    ->hourly()
+    ->everyFiveMinutes()
 
     ->name('sync-metrics')
 

@@ -189,10 +189,6 @@ class MessageResource extends Resource
         $account->access_token
     );
 
-    \Log::info('FB SEND RESULT', $result);
-
-    dd($result);   // <-- tambahkan ini sementara
-
     if (isset($result['error'])) {
         throw new \Exception(
             $result['error']['message']

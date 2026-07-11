@@ -9,6 +9,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
+/**
+ * @property int                             $id
+ * @property string                          $platform
+ * @property string                          $username
+ * @property string|null                     $display_name
+ * @property string                          $account_id
+ * @property string|null                     $access_token
+ * @property string|null                     $refresh_token
+ * @property \Illuminate\Support\Carbon|null $token_expired_at
+ * @property int|null                        $created_by
+ * @property \Illuminate\Support\Carbon      $created_at
+ * @property \Illuminate\Support\Carbon      $updated_at
+ */
 class SocialAccount extends Model
 {
     use HasFactory;

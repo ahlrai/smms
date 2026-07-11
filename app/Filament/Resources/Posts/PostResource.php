@@ -647,7 +647,9 @@ $post->socialAccounts()
                         return ['success' => false, 'message' => $res['error']['message']];
                     }
 
-                    $mediaId = $res['id'] ?? null;
+                    // /photos returns both `id` (photo object) and `post_id` (feed post).
+                    // We must store post_id — only feed post IDs support permalink_url in FetchPostUrlJob.
+                    $mediaId = $res['post_id'] ?? $res['id'] ?? null;
                 }
 
                 $post->socialAccounts()->updateExistingPivot($acc->id, [
@@ -662,7 +664,8 @@ $post->socialAccounts()
             foreach ($allMedia as $mediaItem) {
                 $media    = str_replace('storage/', '', $mediaItem);
                 $filePath = public_path('storage/' . $media);
-                $upload   = $cloudinary->uploadApi()->upload($filePath, ['resource_type' => 'image']);
+
+                $upload = $cloudinary->uploadApi()->upload($filePath, ['resource_type' => 'image']);
 
                 $photoRes = Http::post("https://graph.facebook.com/v22.0/{$pageId}/photos", [
                     'url'          => $upload['secure_url'],
@@ -689,12 +692,14 @@ $post->socialAccounts()
             }
 
             $postId = $feedRes['id'] ?? null;
+
             $post->socialAccounts()->updateExistingPivot($acc->id, [
                 'platform_post_id' => $postId,
                 'post_url'         => null,
             ]);
 
             return ['success' => true, 'post_id' => $postId];
+
         }
 
         return ['success' => false, 'message' => 'Akun Facebook tidak ditemukan'];
@@ -896,11 +901,23 @@ $post->socialAccounts()
                     ->dateTime('d M Y H:i')
                     ->sortable(),
 
-                TextColumn::make('post_url')
+                TextColumn::make('platform_urls')
                     ->label('URL Post')
-                    ->url(fn($record) => $record->post_url)
-                    ->openUrlInNewTab()
-                    ->limit(30),
+                    ->getStateUsing(function (Post $record): string {
+                        $links = $record->publishResults
+                            ->filter(fn ($r) => $r->post_url)
+                            ->map(function ($r) {
+                                $platform = $r->socialAccount?->platform ?? 'unknown';
+                                $label    = strtoupper($platform);
+                                $color    = $platform === 'instagram' ? '#E1306C' : '#1877F2';
+                                return "<a href=\"{$r->post_url}\" target=\"_blank\" "
+                                    . "style=\"color:{$color};font-weight:600;margin-right:8px;\">"
+                                    . "{$label} ↗</a>";
+                            });
+
+                        return $links->isNotEmpty() ? $links->implode(' ') : '—';
+                    })
+                    ->html(),
 
                 TextColumn::make('created_at')
                     ->label('Dibuat')
@@ -1325,5 +1342,16 @@ if (in_array('facebook', $platforms)) {
             'edit' => Pages\EditPost::route('/{record}/edit'),
 
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | EAGER LOAD
+    |--------------------------------------------------------------------------
+    */
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with('publishResults.socialAccount');
     }
 }

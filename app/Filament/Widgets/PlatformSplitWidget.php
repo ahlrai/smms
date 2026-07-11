@@ -12,6 +12,11 @@ class PlatformSplitWidget extends ChartWidget
     protected static ?int $sort                = 3;
     protected int | string | array $columnSpan = 1;
 
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasPermissionTo('analytics.view') ?? false;
+    }
+
     protected function getData(): array
     {
         $fb = Metric::where('platform', 'facebook')

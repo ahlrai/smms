@@ -15,6 +15,11 @@ class EngagementChartWidget extends ChartWidget
 
     public ?string $filter = 'weekly';
 
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasPermissionTo('analytics.view') ?? false;
+    }
+
     protected function getFilters(): ?array
     {
         return [

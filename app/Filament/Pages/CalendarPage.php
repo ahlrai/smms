@@ -13,6 +13,11 @@ class CalendarPage extends Page
     protected static ?int    $navigationSort                 = 5;
     protected string $view = 'filament.pages.calendar-page';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyPermission(['post.schedule', 'post.create']) ?? false;
+    }
+
     protected function getHeaderWidgets(): array
     {
         return [

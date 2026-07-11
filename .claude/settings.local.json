@@ -17,7 +17,9 @@
       "Bash(mysql -u root smms_db -e \"DESCRIBE post_media;\")",
       "Bash(/dev/null:*)",
       "Bash(grep -v \"//\\\\|Log::\")",
-      "Bash(php -l app/Filament/Resources/UserSocialPermissions/UserSocialPermissionResource.php)"
+      "Bash(php -l app/Filament/Resources/UserSocialPermissions/UserSocialPermissionResource.php)",
+      "Bash(php artisan *)",
+      "Bash(grep -n 'protected string $view\\\\|canAccess\\\\|navigationIcon\\\\|navigationLabel' app/Filament/Pages/UnifiedInboxPage.php app/Filament/Pages/CalendarPage.php)"
     ]
   }
 }

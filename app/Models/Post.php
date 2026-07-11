@@ -13,17 +13,17 @@ class Post extends Model
     use HasFactory;
 
     protected $fillable = [
-    'social_account_id',
-    'platform',
-    'title',
-    'caption',
-    'media',
-    'status',
-    'platform_post_id',
-    'scheduled_at',
-    'published_at',
-    'fail_reason',
-    'created_by',
+        'social_account_id',
+        'platform',
+        'title',
+        'caption',
+        'media',
+        'status',
+        'post_url',
+        'scheduled_at',
+        'published_at',
+        'fail_reason',
+        'created_by',
     ];
 
     protected $casts = [
@@ -91,10 +91,18 @@ class Post extends Model
             'post_social_accounts',
             'post_id',
             'social_account_id'
-        )->withPivot([
+        )
+        ->using(PostSocialAccount::class)
+        ->withPivot([
             'platform_post_id',
             'post_url',
         ]);
+    }
+
+    // Direct hasMany on the pivot rows — query publish results without going through SocialAccount
+    public function publishResults()
+    {
+        return $this->hasMany(PostSocialAccount::class, 'post_id');
     }
 
     public function postMedia()

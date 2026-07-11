@@ -15,10 +15,10 @@ class FacebookService
     public function __construct()
     {
         $this->version =
-            config(
-                'services.facebook.graph_version',
+            SettingService::get(
+                'facebook_graph_version',
                 'v22.0'
-            );
+                );
 
         $this->baseUrl =
             'https://graph.facebook.com/'
@@ -34,7 +34,7 @@ class FacebookService
     |--------------------------------------------------------------------------
     */
 
-    public function getLoginUrl(): string
+    public function getOAuthUrl(): string
 {
     $state = bin2hex(random_bytes(16));
 
@@ -51,28 +51,30 @@ class FacebookService
         'pages_manage_metadata',
         'pages_manage_posts',
         'pages_messaging',
+        'read_insights',          // required for /{page-id}/insights
 
         // Instagram
         'instagram_basic',
         'instagram_content_publish',
         'instagram_manage_comments',
         'instagram_manage_messages',
+        'instagram_manage_insights',
 
         // Optional
         'business_management',
 
         // Default
-        'public_profile'
+        'public_profile',
     ];
 
 
     $params = [
 
         'client_id' =>
-            config('services.facebook.app_id'),
+            SettingService::get('facebook_app_id'),
 
         'redirect_uri' =>
-            config('services.instagram.callback_url'),
+            SettingService::get('instagram_callback_url'),
 
         'scope' =>
             implode(',', $scopes),
@@ -134,15 +136,11 @@ class FacebookService
 
             ?
 
-            config(
-                'services.instagram.callback_url'
-            )
+            SettingService::get('instagram_callback_url')
 
             :
 
-            config(
-                'services.facebook.callback_url'
-            );
+            SettingService::get('facebook_callback_url');
 
 
         $response =
@@ -153,14 +151,10 @@ class FacebookService
                 [
 
                     'client_id' =>
-                        config(
-                            'services.facebook.app_id'
-                        ),
+                        SettingService::get('facebook_app_id'),
 
                     'client_secret' =>
-                        config(
-                            'services.facebook.app_secret'
-                        ),
+                        SettingService::get('facebook_app_secret'),
 
                     'redirect_uri' =>
                         $redirectUri,
@@ -203,14 +197,10 @@ class FacebookService
                         'fb_exchange_token',
 
                     'client_id' =>
-                        config(
-                            'services.facebook.app_id'
-                        ),
+                        SettingService::get('facebook_app_id'),
 
                     'client_secret' =>
-                        config(
-                            'services.facebook.app_secret'
-                        ),
+                        SettingService::get('facebook_app_secret'),
 
                     'fb_exchange_token' =>
                         $token
@@ -251,19 +241,14 @@ class FacebookService
 
                     'access_token' =>
 
-                        config(
-                            'services.facebook.app_id'
-                        )
-
-                        .
+                        SettingService::get('facebook_app_id'),
 
                         '|'
 
                         .
 
-                        config(
-                            'services.facebook.app_secret'
-                        )
+                        SettingService::get('facebook_app_secret'),
+
 
                 ]
 
@@ -479,29 +464,73 @@ class FacebookService
     |--------------------------------------------------------------------------
     */
 
-    public function fetchPostEngagement(SocialAccount $account, string $postId): array
-    {
-        try {
-            $response = Http::get($this->baseUrl . '/' . $postId, [
-                'fields'       => 'likes.summary(true),comments.summary(true),shares,reactions.summary(true)',
-                'access_token' => $account->access_token,
-            ]);
+    public function fetchPostEngagement(
+    SocialAccount $account,
+    string $postId
+): array {
 
-            $data = $response->json();
+    try {
 
-            Log::info('FB Post Engagement', ['post_id' => $postId, 'data' => $data]);
+        $response = Http::get(
+            $this->baseUrl.'/'.$postId,
+            [
+                'fields' =>
+                    'id,reactions.summary(total_count),comments.summary(true),shares',
 
-            return [
-                'likes'    => $data['likes']['summary']['total_count']     ?? 0,
-                'comments' => $data['comments']['summary']['total_count']  ?? 0,
-                'shares'   => $data['shares']['count']                     ?? 0,
-            ];
-        } catch (\Exception $e) {
-            Log::error('FB fetchPostEngagement [' . $postId . ']: ' . $e->getMessage());
+                'access_token' =>
+                    $account->access_token,
+            ]
+        );
+
+
+        $data = $response->json();
+        Log::info('RAW FB ENGAGEMENT', $data);
+
+
+        Log::info('FB POST ENGAGEMENT', [
+            'post_id' => $postId,
+            'data' => $data
+        ]);
+
+
+        if (isset($data['error'])) {
+
+            Log::warning(
+                'FB ENGAGEMENT ERROR',
+                $data['error']
+            );
+
             return [];
         }
-    }
 
+
+        return [
+
+            'likes' =>
+                $data['reactions']['summary']['total_count'] ?? 0,
+
+
+            'comments' =>
+                $data['comments']['summary']['total_count'] ?? 0,
+
+
+            'shares' =>
+                $data['shares']['count'] ?? 0,
+
+        ];
+
+
+    } catch (\Exception $e) {
+
+
+        Log::error(
+            'FB fetchPostEngagement: '.$e->getMessage()
+        );
+
+
+        return [];
+    }
+}
     /*
     |--------------------------------------------------------------------------
     | METRICS — LEVEL PAGE
@@ -511,27 +540,32 @@ class FacebookService
     public function fetchPageInsights(SocialAccount $account): array
     {
         try {
+            // page_post_engagements was deprecated in v18.0.
+            // page_impressions and page_impressions_unique require the read_insights OAuth scope.
+            // since/until are required for day-period metrics in v22.0.
             $response = Http::get($this->baseUrl . '/' . $account->account_id . '/insights', [
-                'metric'       => 'page_impressions,page_impressions_unique,page_post_engagements,page_fans',
+                'metric'       => 'page_impressions,page_impressions_unique,page_fans',
                 'period'       => 'day',
+                'since'        => now()->subDay()->startOfDay()->timestamp,
+                'until'        => now()->endOfDay()->timestamp,
                 'access_token' => $account->access_token,
             ]);
 
-            Log::info('FB Page Insights', $response->json());
+            $json = $response->json();
 
-            return $response->json('data', []);
+            if (isset($json['error'])) {
+                Log::warning('FB Page Insights error', ['account' => $account->username, 'error' => $json['error']]);
+                return [];
+            }
+
+            Log::info('FB Page Insights', ['account' => $account->username, 'data' => $json]);
+
+            return $json['data'] ?? [];
         } catch (\Exception $e) {
             Log::error('FB fetchPageInsights: ' . $e->getMessage());
             return [];
         }
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | REPLY TO COMMENT
-    |--------------------------------------------------------------------------
-    */
-
     /*
     |--------------------------------------------------------------------------
     | SEND DM (Messenger)
@@ -646,38 +680,4 @@ public function publishPhoto(
 
     return $response->json();
 }
-
-public function sendMessage(
-    string $recipientId,
-    string $message,
-    string $token
-): array {
-
-    $response = Http::post(
-        $this->baseUrl . '/me/messages',
-        [
-            'recipient' => [
-                'id' => $recipientId,
-            ],
-
-            'message' => [
-                'text' => $message,
-            ],
-
-            'messaging_type' => 'RESPONSE',
-
-            'access_token' => $token,
-        ]
-    );
-
-    if (config('app.debug')) {
-    Log::info('FB SEND MESSAGE', [
-    'recipient' => $recipientId,
-    'response' => $response->json(),
-]);
-    }
-
-    return $response->json();
-}
-
 }

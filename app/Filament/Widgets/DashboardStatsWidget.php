@@ -12,6 +12,11 @@ class DashboardStatsWidget extends BaseWidget
 {
     protected static ?int $sort = 2;
 
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasAnyPermission(['post.create', 'post.edit', 'message.view', 'comment.view']) ?? false;
+    }
+
     protected function getStats(): array
     {
         $publishedPosts    = Post::where('status', 'published')->count();

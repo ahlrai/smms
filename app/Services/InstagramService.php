@@ -13,10 +13,7 @@ class InstagramService
 
     public function __construct()
     {
-        $version = config(
-            'services.facebook.graph_version',
-            'v22.0'
-        );
+        $version = SettingService::graphVersion();
 
         $this->baseUrl =
             'https://graph.facebook.com/' . $version;
@@ -33,10 +30,10 @@ class InstagramService
         $params = http_build_query([
 
             'client_id' =>
-                config('services.facebook.app_id'),
+                SettingService::facebookAppId(),
 
             'redirect_uri' =>
-                config('services.instagram.callback_url'),
+                SettingService::instagramCallbackUrl(),
 
             'scope' => implode(',', [
 
@@ -47,6 +44,8 @@ class InstagramService
                 'instagram_manage_comments',
 
                 'instagram_manage_messages',
+
+                'instagram_manage_insights',
 
                 'pages_show_list',
 
@@ -434,24 +433,47 @@ class InstagramService
     public function fetchMediaInsights(SocialAccount $account, string $mediaId): array
     {
         try {
-            // like_count & comments_count langsung dari media object
+            // Read media type, like_count, and comments_count from the media object.
+            // like_count: valid for all media types, but returns 0 when the account
+            // owner has enabled "Hide Like Counts" in Instagram Settings.
             $media = Http::get($this->baseUrl . '/' . $mediaId, [
-                'fields'       => 'like_count,comments_count',
+                'fields'       => 'media_type,like_count,comments_count',
                 'access_token' => $account->access_token,
             ])->json();
 
-            // reach, impressions, saved, shares dari /insights
-            $raw = Http::get($this->baseUrl . '/' . $mediaId . '/insights', [
-                'metric'       => 'reach,impressions,saved,shares',
+            if (isset($media['error'])) {
+                Log::warning('IG Media object error', ['media_id' => $mediaId, 'error' => $media['error']]);
+            }
+
+            $isReel = ($media['media_type'] ?? '') === 'REELS';
+
+            // For Reels: 'likes' is still available from /insights (not deprecated for Reels).
+            // For feed posts: 'likes' was removed from /insights in v18.0; use like_count instead.
+            $metrics = $isReel
+                ? 'reach,impressions,saved,shares,likes,plays'
+                : 'reach,impressions,saved,shares';
+
+            $insightsResponse = Http::get($this->baseUrl . '/' . $mediaId . '/insights', [
+                'metric'       => $metrics,
                 'access_token' => $account->access_token,
-            ])->json('data', []);
+            ])->json();
 
-            $insights = collect($raw)->pluck('value', 'name')->toArray();
+            if (isset($insightsResponse['error'])) {
+                Log::warning('IG Media Insights error', ['media_id' => $mediaId, 'is_reel' => $isReel, 'error' => $insightsResponse['error']]);
+            }
 
-            Log::info('IG Media Insights', ['media_id' => $mediaId, 'data' => $insights]);
+            $insights = collect($insightsResponse['data'] ?? [])->pluck('value', 'name')->toArray();
+
+            Log::info('IG Media Insights', ['media_id' => $mediaId, 'media_type' => $media['media_type'] ?? 'unknown', 'insights' => $insights]);
+
+            // For Reels prefer insights 'likes' (API-level count, not affected by hidden-likes UI).
+            // For regular posts fall back to like_count from the media object.
+            $likes = $isReel
+                ? ($insights['likes'] ?? $media['like_count'] ?? 0)
+                : ($media['like_count'] ?? 0);
 
             return [
-                'likes'       => $media['like_count']      ?? 0,
+                'likes'       => $likes,
                 'comments'    => $media['comments_count']  ?? 0,
                 'reach'       => $insights['reach']        ?? 0,
                 'impressions' => $insights['impressions']  ?? 0,
@@ -473,15 +495,26 @@ class InstagramService
     public function fetchAccountInsights(SocialAccount $account): array
     {
         try {
+            // Graph API v22.0 requires explicit since/until for period=day account insights.
+            // Without them the API returns an empty data set.
             $response = Http::get($this->baseUrl . '/' . $account->account_id . '/insights', [
                 'metric'       => 'impressions,reach,profile_views',
                 'period'       => 'day',
+                'since'        => now()->subDay()->startOfDay()->timestamp,
+                'until'        => now()->endOfDay()->timestamp,
                 'access_token' => $account->access_token,
             ]);
 
-            Log::info('IG Account Insights', $response->json());
+            $json = $response->json();
 
-            return $response->json('data', []);
+            if (isset($json['error'])) {
+                Log::warning('IG Account Insights error', ['account' => $account->username, 'error' => $json['error']]);
+                return [];
+            }
+
+            Log::info('IG Account Insights', ['account' => $account->username, 'data' => $json]);
+
+            return $json['data'] ?? [];
         } catch (\Exception $e) {
             Log::error('IG fetchAccountInsights: ' . $e->getMessage());
             return [];

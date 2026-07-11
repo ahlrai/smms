@@ -20,6 +20,11 @@ class CalendarWidget extends Widget
      */
     protected static ?string $pollingInterval = '10s';
 
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasAnyPermission(['post.schedule', 'post.create']) ?? false;
+    }
+
     public int $year;
     public int $month;
 

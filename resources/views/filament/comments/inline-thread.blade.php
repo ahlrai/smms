@@ -15,7 +15,7 @@
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:4px;">
                 <span style="font-size:14px; font-weight:700; color:#f1f5f9;">&#64;{{ $comment->commenter_username }}</span>
                 <span style="color:#475569; font-size:12px;">·</span>
-                <span style="color:#475569; font-size:12px;">{{ $comment->commented_at?->diffForHumans() }}</span>
+                <span style="color:#475569; font-size:12px;">{{ $comment->created_at?->timezone(config('app.timezone'))->diffForHumans() }}</span>
                 @if($comment->like_count > 0)
                     <span style="color:#475569; font-size:12px;">· ♥ {{ $comment->like_count }}</span>
                 @endif
@@ -48,7 +48,7 @@
                         <span style="font-size:11px; font-weight:600; color:#fbbf24;">⚠ Belum terkirim</span>
                     @endif
                     <span style="color:#475569; font-size:12px;">·</span>
-                    <span style="color:#475569; font-size:12px;">{{ $reply->created_at?->diffForHumans() }}</span>
+                    <span style="color:#475569; font-size:12px;">{{ $reply->created_at?->timezone(config('app.timezone'))->diffForHumans() }}</span>
                 </div>
                 <p style="font-size:13px; color:#94a3b8; white-space:pre-wrap; word-break:break-word; line-height:1.6; margin:0;">{{ $reply->reply }}</p>
             </div>

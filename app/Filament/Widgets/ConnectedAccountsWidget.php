@@ -11,6 +11,11 @@ class ConnectedAccountsWidget extends Widget
     protected static ?int $sort            = 3;
     protected int|string|array $columnSpan = 'full';
 
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasPermissionTo('social.manage') ?? false;
+    }
+
     protected function getViewData(): array
     {
         return [

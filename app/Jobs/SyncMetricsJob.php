@@ -18,7 +18,7 @@ class SyncMetricsJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries   = 2;
-    public int $timeout = 120;
+    public int $timeout = 60;
 
     public function handle(FacebookService $fb, InstagramService $ig): void
     {
@@ -51,62 +51,40 @@ class SyncMetricsJob implements ShouldQueue
             ->wherePivotNotNull('platform_post_id')
             ->get();
 
-        foreach ($posts as $post) {
-            $platformPostId = $post->pivot->platform_post_id;
-            $engagement     = $fb->fetchPostEngagement($account, $platformPostId);
+    foreach ($posts as $post) {
 
-            if (empty($engagement)) continue;
+    $platformPostId = $post->pivot->platform_post_id;
 
-            Metric::updateOrCreate(
-                [
-                    'social_account_id' => $account->id,
-                    'post_id'           => $post->id,
-                    'recorded_date'     => today(),
-                ],
-                [
-                    'platform'    => 'facebook',
-                    'likes'       => $engagement['likes']    ?? 0,
-                    'comments'    => $engagement['comments'] ?? 0,
-                    'shares'      => $engagement['shares']   ?? 0,
-                    'reach'       => 0,
-                    'impressions' => 0,
-                ]
-            );
+        if (! $platformPostId) {
+            continue;
         }
 
-        // ── Account-level (page) metrics ──────────────────────
-        $pageInsights = $fb->fetchPageInsights($account);
-
-        // API returns array: [{name, period, values:[{value, end_time}]}]
-        // Ambil value terbaru (index terakhir) dari setiap metrik
-        $map = [];
-        foreach ($pageInsights as $insight) {
-            $values     = $insight['values'] ?? [];
-            $map[$insight['name']] = !empty($values) ? (end($values)['value'] ?? 0) : 0;
-        }
-
-        Metric::updateOrCreate(
-            [
-                'social_account_id' => $account->id,
-                'post_id'           => null,
-                'recorded_date'     => today(),
-            ],
-            [
-                'platform'    => 'facebook',
-                'impressions' => $map['page_impressions']        ?? 0,
-                'reach'       => $map['page_impressions_unique'] ?? 0,
-                'likes'       => $map['page_post_engagements']   ?? 0,
-                'comments'    => 0,
-                'shares'      => 0,
-            ]
+        $engagement = $fb->fetchPostEngagement(
+            $account,
+            $platformPostId
         );
 
-        Log::info('SyncMetricsJob: Facebook metrics synced untuk ' . $account->username, [
-            'posts'      => $posts->count(),
-            'page_reach' => $map['page_impressions_unique'] ?? 0,
-        ]);
-    }
+    Metric::updateOrCreate(
+        [
+            'social_account_id' => $account->id,
+            'post_id'           => $post->id,
+            'recorded_date'     => today(),
+        ],
+        [
+            'platform'    => 'facebook',
 
+            // sementara
+            'likes'       => $engagement['likes'] ?? 0,
+            'comments'    => $engagement['comments'] ?? 0,
+            'shares'      => $engagement['shares'] ?? 0,
+
+            'reach'       => 0,
+            'impressions' => 0,
+        ]
+    );
+}
+    }
+    
     private function syncInstagramMetrics(SocialAccount $account, InstagramService $ig): void
     {
         // ── Per-post metrics ──────────────────────────────────

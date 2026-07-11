@@ -28,7 +28,7 @@ class Comment extends Model
     ];
 
     protected $casts = [
-        'commented_at' => 'datetime',
+        'commented_at' => 'datetime:Y-m-d H:i:s',
         'is_replied'   => 'boolean',
         'is_hidden'    => 'boolean',
     ];

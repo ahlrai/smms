@@ -22,12 +22,11 @@ class UserSocialPermissionResource extends Resource
 {
     protected static ?string $model                           = UserSocialPermission::class;
     protected static string|\BackedEnum|null $navigationIcon  = 'heroicon-o-key';
-    protected static string|\UnitEnum|null $navigationGroup   = 'User Management';
+    protected static string|\UnitEnum|null $navigationGroup   = 'Management';
     protected static ?string $navigationLabel                 = 'Izin Akun Sosial';
     protected static ?int    $navigationSort                  = 2;
 
-    // Hanya Admin yang bisa akses
-    public static function canAccess(): bool
+    public static function canViewAny(): bool
     {
         return auth()->user()?->hasPermissionTo('roles.manage') ?? false;
     }

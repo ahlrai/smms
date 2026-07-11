@@ -37,8 +37,12 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
-    public function canAccessPanel(Panel $panel): bool
+    public function canAccessPanel(Panel $_panel): bool
     {
-        return true;
+        try {
+            return $this->hasPermissionTo('panel.access');
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
+            return $this->roles()->exists();
+        }
     }
 }

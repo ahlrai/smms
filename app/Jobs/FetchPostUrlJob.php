@@ -56,11 +56,17 @@ class FetchPostUrlJob implements ShouldQueue
                         Log::warning('FetchPostUrlJob IG: ' . ($res['error']['message'] ?? 'unknown'));
                     }
                 } elseif ($account->isFacebook()) {
+                    // Field yang tersedia untuk permalink bisa beda-beda antar tipe objek (feed/photo/video).
+                    // Kita coba dengan fallback.
                     $res = Http::timeout(15)->get(
                         "https://graph.facebook.com/v22.0/{$pid}",
-                        ['fields' => 'permalink_url', 'access_token' => $account->access_token]
+                        ['fields' => 'permalink_url,permalink', 'access_token' => $account->access_token]
                     )->json();
-                    $url = $res['permalink_url'] ?? null;
+
+                    $url = $res['permalink_url']
+                        ?? $res['permalink']
+                        ?? null;
+
                     if (isset($res['error'])) {
                         Log::warning('FetchPostUrlJob FB: ' . ($res['error']['message'] ?? 'unknown'));
                     }
